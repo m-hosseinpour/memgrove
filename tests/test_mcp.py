@@ -197,9 +197,15 @@ class ToolsListTests(McpTestCase):
             self.assertIn(f"- {memory_type}:", init["instructions"])
         # MCP has no channel that pushes the index into a client's context, so
         # the only portable trigger is the contract: the first call of a
-        # session, and a repeat once the index is no longer in context.
+        # conversation, and a repeat once the index is no longer in context.
         self.assertIn("Session bootstrap", init["instructions"])
         self.assertIn("compaction", init["instructions"])
+        # The trigger is the first user turn, not "the session": a session's
+        # start is invisible to the model, and a client's own opening ritual can
+        # claim the same slot. Both halves of that fix are load-bearing, so both
+        # stay asserted — a rewrite that drops either one brings the misses back.
+        self.assertIn("first user turn", init["instructions"])
+        self.assertIn("loading a skill", init["instructions"])
         # Once per conversation, not once per user message. The earlier wording
         # ("never answer from an index you saw only in an earlier context") was
         # read as "any earlier turn" and re-took the index at the start of every
@@ -210,7 +216,11 @@ class ToolsListTests(McpTestCase):
             tools["memory_index"]["description"],
         )
         # A client that drops the instructions still sends the tool schemas.
-        self.assertIn("before your first action", tools["memory_index"]["description"])
+        self.assertIn("first user turn", tools["memory_index"]["description"])
+        # The fallback surface needs the arbitration clause too: a client that
+        # drops the instructions is exactly the one whose own skill gate can
+        # swallow the first call.
+        self.assertIn("loading a skill", tools["memory_index"]["description"])
 
     def test_the_param_table_matches_the_schemas(self):
         """_TOOL_PARAMS decides what an unknown argument is, so it must not

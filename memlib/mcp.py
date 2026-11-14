@@ -76,19 +76,30 @@ INTERNAL_ERROR = -32603
 # new user task — one measured session took it on 6 of 7 messages with no
 # compaction anywhere in the record. The repeat costs a round trip and buys
 # nothing, because the index the client already holds is in the same context.
+#
+# The trigger is the first user turn in the context, not "the session": a
+# session's start is invisible to a model — instructions and system prompt are
+# identical at every turn — so "before your first action in a session" never
+# fires at a moment the model can recognise. The first user turn is observable.
+# The other half is arbitration: a client's own opening ritual can claim the
+# same "before the first action" slot without mentioning memory (OpenCode's
+# skill gate does), and a session that begins by loading a skill skipped the
+# index. Naming that case here keeps the two from displacing each other;
+# ordering them is the client's business, not the store's.
 INSTRUCTIONS = (
     "Shared memory store for coding agents: plain markdown notes on disk, one "
     "note per file, shared by every agent connected to this store.\n"
     "\n"
-    "Session bootstrap: take the index once — before your first action in a "
-    "session, call memory_index with cwd set to the session's working "
-    "directory, then memory_read the notes that apply. A later user message in "
-    "the same conversation is not a new session and needs no second call: the "
-    "result stays usable while it is still in the context. Call it again only "
-    "when the index is no longer there at all — after a compaction, or in a "
-    "session resumed without its earlier turns — and never answer from an index "
-    "the context no longer holds. The index is cheap and uncapped; a note's "
-    "description says when it applies.\n"
+    "Session bootstrap: take the index once per conversation — on the first "
+    "user turn in this context, before you act on that turn, and whether or not "
+    "you begin by loading a skill or reading files, call memory_index with cwd "
+    "set to the session's working directory, then memory_read the notes that "
+    "apply. A later user message in the same conversation is not a new session "
+    "and needs no second call: the result stays usable while it is still in the "
+    "context. Call it again only when the index is no longer there at all — "
+    "after a compaction, or in a session resumed without its earlier turns — "
+    "and never answer from an index the context no longer holds. The index is "
+    "cheap and uncapped; a note's description says when it applies.\n"
     "\n"
     "Notes live in two scopes, and the index lists both: 'project' holds what "
     "is true of this repository — codebase rules, procedures learned here, "
@@ -154,9 +165,10 @@ def _tool_definitions() -> list[dict[str, Any]]:
             "description": (
                 "List the notes in the shared store: a one-line entry per memory "
                 "(title, file name, description), grouped by type, for the global "
-                "and the project store. Call it once, before your first action in "
-                "a session, and only again once the index is no longer in context "
-                "— never on each new user message; "
+                "and the project store. Call it on the first user turn in this "
+                "context, before acting on that turn, whether or not you begin "
+                "by loading a skill or reading files, and again only once the "
+                "index is no longer in context — never on each new user message; "
                 "pass cwd when the server serves several projects. Read an entry "
                 "with memory_read before relying on it."
             ),

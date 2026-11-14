@@ -104,8 +104,9 @@ Tools:
 
 The server's usage contract — the two scopes, the four types, what not to save, `if_version` —
 travels in the MCP `instructions` field of `initialize` / `server/discover`, which is what that
-field is for. It opens with the session bootstrap: call `memory_index` with `cwd` before the
-first action, **once per conversation** — a later user message is not a new session — and again
+field is for. It opens with the session bootstrap: on the first user turn in the context, before
+acting on it — even when the turn begins by loading a skill or reading files — call `memory_index`
+with `cwd`; **once per conversation**, since a later user message is not a new session, and again
 only after a compaction or a resume that did not carry the index, when it is no longer in context.
 MCP has no channel that pushes the index into a client's context, so this contract is the
 portable way to get it in front of the model without an adapter per client. No `AGENTS.md`
