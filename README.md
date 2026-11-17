@@ -8,7 +8,7 @@ useful notes across projects and sessions. Notes are ordinary Markdown files in
 `~/.agents/memgrove` — not a database — and the agent decides what is worth saving and reads a
 note back when it is relevant.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/m-hosseinpour/memgrove/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/memgrove.svg)](https://pypi.org/project/memgrove/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 
@@ -37,9 +37,9 @@ memgrove --version
 Upgrade with `uv tool upgrade memgrove` (or `pipx upgrade memgrove`), pin a release with
 `memgrove==<version>`, and run the server without installing it with
 `uvx --from memgrove memgrove mcp`. Already have notes in Claude Code?
-[Import them](https://github.com/m-hosseinpour/memgrove/blob/main/docs/usage.md#migrating-from-claude-code).
+[Import them](docs/usage.md#migrating-from-claude-code).
 On Windows the same commands work in PowerShell; see
-[Windows notes](https://github.com/m-hosseinpour/memgrove/blob/main/docs/windows.md).
+[Windows notes](docs/windows.md).
 
 ## Connect an agent
 
@@ -59,7 +59,7 @@ OpenCode — `~/.config/opencode/opencode.json`:
 ```
 
 DSH, an agent with no MCP client, and the details of how the server's usage contract reaches the
-model are in [docs/agents.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/agents.md).
+model are in [docs/agents.md](docs/agents.md).
 
 ## Check it works
 
@@ -90,12 +90,12 @@ pass, so fixing a body cannot move a note to another section of the index.
 
 | Document | Contents |
 |---|---|
-| [docs/agents.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/agents.md) | MCP setup per client, the `instructions` contract, manual connection |
-| [docs/usage.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/usage.md) | CLI reference, exit codes, consolidation, store layout, importing Claude Code notes |
-| [docs/windows.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/windows.md) | Windows install and shell differences |
-| [docs/design.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/design.md) | the design, the alternatives dropped, and the closed decisions |
-| [docs/roadmap.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/roadmap.md) | the changelog |
-| [docs/research.md](https://github.com/m-hosseinpour/memgrove/blob/main/docs/research.md) | how Claude Code and Qoder actually work |
+| [docs/agents.md](docs/agents.md) | MCP setup per client, the `instructions` contract, manual connection |
+| [docs/usage.md](docs/usage.md) | CLI reference, exit codes, consolidation, store layout, importing Claude Code notes |
+| [docs/windows.md](docs/windows.md) | Windows install and shell differences |
+| [docs/design.md](docs/design.md) | the design, the alternatives dropped, and the closed decisions |
+| [docs/roadmap.md](docs/roadmap.md) | the changelog |
+| [docs/research.md](docs/research.md) | how Claude Code and Qoder actually work |
 
 ## Development
 
@@ -108,12 +108,11 @@ python3 -m unittest discover -s tests -v
 ```
 
 `python -m memgrove` and `bin/memgrove` run the checkout without installing. Repository rules,
-the Windows test command, and the release process are in
-[AGENTS.md](https://github.com/m-hosseinpour/memgrove/blob/main/AGENTS.md).
+the Windows test command, and the release process are in [AGENTS.md](AGENTS.md).
 
 ## License
 
-MIT — see [`LICENSE`](https://github.com/m-hosseinpour/memgrove/blob/main/LICENSE).
+MIT — see [`LICENSE`](LICENSE).
 
 If memgrove is useful in your workflow, consider starring the repository to help other
 developers looking for shared memory for their coding agents find it.
