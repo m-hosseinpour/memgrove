@@ -123,11 +123,11 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 `agent_memory`، `agent.memory` و `agent-mem` هم مسدودند؛ تغییر نام به `memgrove` برای عبور از
 همین چک بود، نه سلیقه.
 
-**پیش‌نیاز: نام مخزن.** فیلد Repository name در trusted publisher باید با مخزن واقعی گیت‌هاب یکی
-باشد، نه با نام پکیج. مخزن فعلاً `agent-memory` است؛ یا آن را به `memgrove` تغییر نام بدهید
-(Settings → General → Repository name؛ گیت‌هاب لینک قدیمی را redirect می‌کند)، یا این فیلد را
-`agent-memory` بگذارید. بعد از rename هر دو URL موجود در `origin` را هم به نام جدید به‌روز کنید؛
-گیت‌سرور خودمان ممکن است redirect نکند و remote قدیمی برای fetch بشکند.
+**نام مخزن (انجام شد، ۲۰۲۶-۱۱-۱۷).** مخزن روی گیت‌هاب و گیت‌سرور خودمان به `memgrove` تغییر نام
+داد، هر دو URL در `origin` به‌روز شد (گیت‌هاب لینک قدیمی را redirect می‌کند و گیت‌سرور خودمان ۳۰۱
+می‌دهد) و فیلد Repository name در trusted publisher هم `memgrove` است. اگر روزی مخزن دوباره تغییر
+نام داد، این فیلد و هر دو URL باید با هم عوض شوند، وگرنه OIDC با مخزنی که workflow در آن اجرا
+می‌شود نمی‌خواند و انتشار رد می‌شود.
 
 نکته‌ها:
 
@@ -158,11 +158,12 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 
 ## اتصال ایجنت‌ها
 
-این جدول وضعیت **هدف** بعد از تغییر نام است. ثبت فعلی روی این ماشین هنوز قدیمی است: پکیج
-`agent-memory` با دستور `mem` نصب مانده و ابزارهای `memory_*` را serve می‌کند. بعد از تغییر نام
-باید در هر سه فایل، کلید سرور و دستور `memgrove` شوند و بعد `uv tool uninstall agent-memory`
-اجرا شود؛ وگرنه ایجنتی که `memgrove_index` را صدا بزند از سرور قدیمی «unknown tool» می‌گیرد و
-allowlistهای Claude Code (مثل `mcp__mem__memory_write`) هم دیگر نمی‌خوانند.
+این جدول وضعیت **هدف** است. تا ۲۰۲۶-۱۱-۱۷ opencode و DSH روی `memgrove` ثبت شده‌اند، ولی
+`~/.claude.json` هنوز سرور `mem` با دستور `mem` دارد و پکیج قدیمی `agent-memory` هم نصب مانده.
+باید ورودی به `"memgrove": { "command": "memgrove", "args": ["mcp"] }` تغییر کند و بعد
+`uv tool uninstall agent-memory` اجرا شود؛ وگرنه ایجنتی که `memgrove_index` را صدا بزند از سرور
+قدیمی «unknown tool» می‌گیرد و allowlistهای Claude Code (مثل `mcp__mem__memory_write`) هم دیگر
+نمی‌خوانند.
 
 | ایجنت | محل | نکته |
 |---|---|---|
