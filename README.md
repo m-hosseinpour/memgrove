@@ -80,12 +80,12 @@ uv tool install --reinstall .
 The checkout also runs without any install:
 
 ```bash
-python -m memgrove --help      # every platform
-./bin/memgrove --help             # Linux/macOS
+python -m memgrove --help    # every platform
+./bin/memgrove --help        # Linux/macOS
 ```
 
 ```powershell
-bin\memgrove.cmd --help           # Windows
+bin\memgrove.cmd --help      # Windows
 ```
 
 `MEMGROVE_ROOT` points `memgrove` at a different root (used by the tests).
@@ -300,7 +300,7 @@ memgrove/dream.py      consolidation, called after every change and by `memgrove
 memgrove/mcp.py        MCP stdio server: memgrove_index / memgrove_read / memgrove_write
 memgrove/migrate.py    import Claude Code's per-project notes and rebuild the index
 memgrove/cli.py        argparse surface
-memgrove/PROTOCOL.md   the agent-facing contract; `memgrove protocol` prints it, the shell saves it
+memgrove/PROTOCOL.md  the agent-facing contract; `memgrove protocol` prints it, the shell saves it
 .github/workflows/     the test suite on Linux and Windows, and the tag-triggered release
 docs/                  research.md, design.md, roadmap.md, operations.md
 tests/                 unittest (stdlib only)

@@ -745,7 +745,7 @@ class ProtocolTests(McpTestCase):
     def test_unknown_tool_and_missing_arguments_are_invalid_params(self):
         _, responses, _ = self.serve(
             [
-                self.call("memory_forget", {}, request_id=1),
+                self.call("memgrove_forget", {}, request_id=1),
                 self.call("memgrove_write", {"store": "project", "path": "x.md"}, request_id=2),
                 self.call(
                     "memgrove_read",

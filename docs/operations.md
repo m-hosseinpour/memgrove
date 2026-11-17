@@ -46,6 +46,9 @@
 | `cwd` در درخواست MCP | بر `MEMGROVE_PROJECT_CWD` اولویت دارد. |
 | `cwd`/`--cwd` در CLI | دایرکتوری پروژه برای همان فرمان؛ پیش‌فرض: دایرکتوری جاری. |
 
+نام‌های قدیمی `MEM_ROOT` و `MEMORY_PROJECT_CWD` دیگر خوانده نمی‌شوند و fallback ندارند: اگر در
+تنظیم کلاینتی مانده باشند، بی‌صدا نادیده گرفته می‌شوند و ابزار روی ریشهٔ پیش‌فرض کار می‌کند.
+
 در MCP ترتیب این است: `cwd` صریح ← `MEMGROVE_PROJECT_CWD` ← دایرکتوری جاری سرور.
 
 **هشدار:** سروری که برای چند پروژه یک‌جا اجرا می‌شود (مثل DSH) یک دایرکتوری جاری بی‌معنا
@@ -120,6 +123,12 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 `agent_memory`، `agent.memory` و `agent-mem` هم مسدودند؛ تغییر نام به `memgrove` برای عبور از
 همین چک بود، نه سلیقه.
 
+**پیش‌نیاز: نام مخزن.** فیلد Repository name در trusted publisher باید با مخزن واقعی گیت‌هاب یکی
+باشد، نه با نام پکیج. مخزن فعلاً `agent-memory` است؛ یا آن را به `memgrove` تغییر نام بدهید
+(Settings → General → Repository name؛ گیت‌هاب لینک قدیمی را redirect می‌کند)، یا این فیلد را
+`agent-memory` بگذارید. بعد از rename هر دو URL موجود در `origin` را هم به نام جدید به‌روز کنید؛
+گیت‌سرور خودمان ممکن است redirect نکند و remote قدیمی برای fetch بشکند.
+
 نکته‌ها:
 
 - انتشار روی PyPI برگشت‌ناپذیر است: نام و شمارهٔ نسخهٔ منتشرشده پاک نمی‌شوند. برای تمرین از
@@ -149,6 +158,12 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 
 ## اتصال ایجنت‌ها
 
+این جدول وضعیت **هدف** بعد از تغییر نام است. ثبت فعلی روی این ماشین هنوز قدیمی است: پکیج
+`agent-memory` با دستور `mem` نصب مانده و ابزارهای `memory_*` را serve می‌کند. بعد از تغییر نام
+باید در هر سه فایل، کلید سرور و دستور `memgrove` شوند و بعد `uv tool uninstall agent-memory`
+اجرا شود؛ وگرنه ایجنتی که `memgrove_index` را صدا بزند از سرور قدیمی «unknown tool» می‌گیرد و
+allowlistهای Claude Code (مثل `mcp__mem__memory_write`) هم دیگر نمی‌خوانند.
+
 | ایجنت | محل | نکته |
 |---|---|---|
 | Claude Code | `~/.claude.json`، سرور `memgrove` در scope کاربر | علاوه بر آن `autoMemoryEnabled: false` در `~/.claude/settings.json`، تا حافظهٔ بومی Claude با این انبار هم‌زمان ننویسد. |
@@ -164,7 +179,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
   | ./bin/memgrove mcp | python3 -m json.tool | head -40
 ```
 
-هر سه کلاینت `memgrove mcp` را بدون env اجرا می‌کنند، پس هر سه همان `~/.agents/memory` را می‌بینند.
+هر سه کلاینت سرور را بدون env اجرا می‌کنند، پس هر سه همان `~/.agents/memory` را می‌بینند.
 خواندن بین دو کلاینت در ۲۰۲۶-۱۰-۲۹ تأیید شد (هنوز با نام‌های قدیمی، پیش از تغییر نام به
 `memgrove`): یادداشتی که از راه سرور روی یک انبار موقت نوشته شد، با `claude -p` (ابزار
 `mcp__mem__memory_read`) و `opencode run` (ابزار `mem_memory_read`) هم خوانده شد.
