@@ -1,6 +1,6 @@
 # راه‌اندازی و بهره‌برداری
 
-> وضعیت این ماشین تا ۲۰۲۶-۱۰-۳۰. این سند می‌گوید انبار کجاست، چه ورودی‌هایی دارد،
+> وضعیت این ماشین تا ۲۰۲۶-۱۱-۱۷. این سند می‌گوید انبار کجاست، چه ورودی‌هایی دارد،
 > چطور به ایجنت‌ها وصل شده و چطور می‌شود بررسی‌اش کرد. طرح در [`design.md`](design.md)
 > است و کار باز فعلی در مخزن نیست (قاعده‌اش در [`AGENTS.md`](../AGENTS.md)).
 
@@ -53,6 +53,16 @@
 
 ## نصب و به‌روزرسانی
 
+کاربر عادی از PyPI نصب می‌کند؛ نه clone و نه ساختن:
+
+```bash
+uv tool install agent-memory        # یا: pipx install agent-memory
+mem --version
+uv tool upgrade agent-memory        # به‌روزرسانی
+```
+
+روی این ماشین، برای کار روی خودِ کد، نصب از چک‌اوت است:
+
 ```bash
 uv tool install .        # mem روی PATH
 ./bin/mem write ...      # همان کد، از داخل چک‌اوت، بدون نصب
@@ -66,6 +76,53 @@ uv tool install --reinstall .
 
 وگرنه ایجنت‌ها کد قدیمی را اجرا می‌کنند و تست‌های داخل چک‌اوت ممکن است سبز باشند در حالی
 که رفتار واقعی ایجنت چیز دیگری است.
+
+## انتشار
+
+نسخه یک‌جا زندگی می‌کند: `__version__` در `memlib/__init__.py`. تگ `v<همان نسخه>` است و
+workflow انتشار ([`release.yml`](../.github/workflows/release.yml)) با push همان تگ روی گیت‌هاب
+اجرا می‌شود:
+
+```bash
+# پس از بامپ __version__ و سبز شدن تست‌ها
+git add -A && git commit -m "Release 0.4.0"
+git tag v0.4.0
+git push origin main && git push origin v0.4.0
+```
+
+ترتیب کارها در workflow:
+
+1. تست‌ها روی لینوکس و ویندوز (همان `ci.yml`، به‌صورت reusable).
+2. بررسی این‌که تگ با `memlib.__version__` یکی است؛ نبودِ تطابق job را متوقف می‌کند.
+3. `uv build`، نصب wheel در یک محیط تمیز، و اجرای `mem --version` و `mem protocol`.
+4. انتشار روی PyPI با Trusted Publishing: بدون توکن ذخیره‌شده، با OIDC و environment `pypi`.
+5. ساخت GitHub Release با wheel و sdist پیوست (`--generate-notes`).
+
+**تنظیم یک‌بارهٔ PyPI، پیش از اولین ریلیز:** در
+<https://pypi.org/manage/account/publishing/> یک «pending publisher» بسازید:
+
+| فیلد | مقدار |
+|---|---|
+| PyPI Project Name | `agent-memory` |
+| Owner | `m-hosseinpour` |
+| Repository name | `agent-memory` |
+| Workflow name | `release.yml` |
+| Environment name | `pypi` |
+
+نام `agent-memory` تا ۲۰۲۶-۱۱-۱۷ روی PyPI آزاد بود (`/pypi/agent-memory/json` → 404)؛ همان
+pending publisher نام را رزرو می‌کند و بعد از اولین انتشار به trusted publisher عادی تبدیل
+می‌شود. اگر روزی workflow یا environment تغییر کرد، همین رکورد را به‌روز کنید، نه اینکه توکن
+دستی بسازید.
+
+نکته‌ها:
+
+- انتشار روی PyPI برگشت‌ناپذیر است: نام و شمارهٔ نسخهٔ منتشرشده پاک نمی‌شوند. برای تمرین از
+  TestPyPI استفاده کنید، نه از یک شمارهٔ نسخهٔ واقعی.
+- گیت‌هاب تنها جای اجرای workflow است؛ پس تگ باید روی mirror گیت‌هاب هم برود (`origin` این
+  مخزن گیت‌سرور دیگری است).
+- اگر job پیش از آپلود شکست خورد، همان اجرا را از تب Actions دوباره اجرا کنید (rerun). اگر PyPI
+  نسخه را گرفت و Release ساخته نشد، Release را دستی از همان artifact بسازید. PyPI نسخهٔ تکراری
+  را با `400 File already exists` رد می‌کند، پس برای همان نسخه تگ را دوباره push نکنید.
 
 ## ویندوز
 
@@ -138,7 +195,9 @@ rm -rf "$MEM_ROOT" "$PROJ"
   پشتیبان می‌خواهید، بیرون از ابزار از `~/.agents/memory` کپی دوره‌ای بگیرید (تصمیمش در
   design §۱۱).
 - یک سرور MCP برای چند پروژه باید در هر درخواست `cwd` بگیرد (بالا).
-- `PROTOCOL.md` در ریشهٔ انبار خودکار ساخته نمی‌شود؛ اگر لازم است، دستی از مخزن کپی کنید.
+- `PROTOCOL.md` خودکار در ریشهٔ انبار ساخته نمی‌شود؛ کد فقط چاپش می‌کند:
+  `mem protocol > ~/.agents/memory/PROTOCOL.md` (فایل داخل پکیج است، پس نسخهٔ نصب‌شده هم
+  همان را دارد).
 - فرانت‌متر فقط سه کلیدِ تحت مدیریت را نگه می‌دارد (`name`، `description`، `metadata`)؛ کلید
   دست‌نویس دیگری مثل `title` در اولین بازنویسی حذف می‌شود. عنوانِ ایندکس از `name` ساخته
   می‌شود.

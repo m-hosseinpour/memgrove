@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: run the suite
+        env:
+          MEM_ROOT: ${{ runner.temp }}/mem-test
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s tests -v
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: build the wheel and the sdist
+        run: uv build
+      - name: install the wheel into a clean environment and run it
+        run: |
+          uv venv /tmp/wheel-check
+          uv pip install --python /tmp/wheel-check/bin/python dist/*.whl
+          /tmp/wheel-check/bin/mem --version
+          /tmp/wheel-check/bin/mem protocol > /tmp/PROTOCOL.md
+          test -s /tmp/PROTOCOL.md

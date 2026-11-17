@@ -4,7 +4,8 @@ Everything an agent does goes through the MCP server, which is this module's
 `store`/`index`/`dream` logic in-process. This CLI exists for two callers:
 
 * a human (or a hookless agent) running the same operations by hand;
-* `PROTOCOL.md`, the written contract for an agent that has no MCP client.
+* `PROTOCOL.md`, the written contract for an agent that has no MCP client, which
+  `mem protocol` prints so an installed package carries it too.
 
 Output convention: mutating and query commands print JSON; `index` prints text
 meant to be read, not parsed.
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from importlib import resources
 from pathlib import Path
 
 from . import __version__, config, dream, index, migrate, store
@@ -150,6 +152,17 @@ def cmd_mcp(args) -> int:
     return mcp.serve()
 
 
+def cmd_protocol(args) -> int:
+    """Print the shipped guide, so the copy in the store matches this version.
+
+    A package installed from PyPI has no checkout to copy the file from, so the
+    guide travels inside `memlib` and the shell redirects it into the store.
+    """
+    guide = resources.files("memlib").joinpath("PROTOCOL.md")
+    sys.stdout.write(guide.read_text(encoding="utf-8"))
+    return 0
+
+
 def cmd_dream(args) -> int:
     return dream.run(cwd=args.cwd, all_scopes=args.all)
 
@@ -239,6 +252,11 @@ def build_parser() -> argparse.ArgumentParser:
     idx.set_defaults(func=cmd_index)
 
     sub.add_parser("mcp", help="serve MCP over stdio").set_defaults(func=cmd_mcp)
+
+    sub.add_parser(
+        "protocol",
+        help="print PROTOCOL.md, the guide for an agent without an MCP client",
+    ).set_defaults(func=cmd_protocol)
 
     consolidate = sub.add_parser("dream", help="consolidate memories now")
     consolidate.add_argument("--cwd", default=".")

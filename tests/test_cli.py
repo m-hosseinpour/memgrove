@@ -702,6 +702,19 @@ class ConsolidationOnChangeTests(CliTestCase):
         self.assertEqual(written["version"], store.load(self.project_dir() / "a.md").version)
 
 
+class ProtocolTests(CliTestCase):
+    """The guide ships inside the package, so an installed copy can print it."""
+
+    def test_protocol_prints_the_shipped_file_verbatim(self):
+        shipped = Path(cli.__file__).with_name("PROTOCOL.md")
+        code, text = self.run_cli("protocol")
+        self.assertEqual(code, 0)
+        self.assertEqual(text, shipped.read_text(encoding="utf-8"))
+        self.assertIn("memory_index", text)
+        # A guide, not the JSON contract the mutating commands follow.
+        self.assertFalse(text.lstrip().startswith("{"))
+
+
 class CliErrorShapeTests(CliTestCase):
     """Ordinary failures are one JSON object with an exit code, not a traceback."""
 

@@ -31,7 +31,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 | File | Role |
 |---|---|
 | `README.md` | intro, install, MCP, manual usage, Windows |
-| `PROTOCOL.md` | hand-written connectivity guide for agents without an MCP client |
+| `memlib/PROTOCOL.md` | hand-written connectivity guide for agents without an MCP client; `mem protocol` prints it |
+| `.github/workflows/` | the suite on Linux and Windows, and the tag-triggered release |
 | `docs/design.md` | the design and rejected options; §11 is the closed decisions |
 | `docs/operations.md` | this machine's state and setup |
 | `docs/roadmap.md` | history of what shipped |
@@ -52,6 +53,16 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 - Cross-platform rules: write files as UTF-8 with `newline="\n"` (use `store.replace_file`), read
   CRLF via `store.parse`, and keep the POSIX/Windows lock split inside `store._locked`. Windows
   cannot import `fcntl` or lock a directory handle, so a module-level `fcntl` import breaks the tool.
+
+## Release
+
+- The only version is `__version__` in `memlib/__init__.py`, and the tag `v<version>` must equal
+  it; `release.yml` stops on a mismatch. The workflow then builds, publishes to PyPI through
+  Trusted Publishing, and creates the GitHub Release with the wheel and the sdist.
+- Never upload by hand and never store a PyPI token: the one-time trusted-publisher setup is in
+  `docs/operations.md`. Publishing is irreversible — a name and a version cannot be reused; rehearse
+  on TestPyPI instead.
+- The workflow runs on GitHub only, so the tag must be pushed there as well, not just to `origin`.
 
 ## Git
 

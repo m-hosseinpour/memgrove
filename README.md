@@ -28,20 +28,17 @@ automatically. Agents choose what is worth remembering and retrieve notes when r
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/) (or another Python installer that can create a console
-script) and Python 3.11 or newer.
+Requires Python 3.11 or newer and either [uv](https://docs.astral.sh/uv/) or
+[pipx](https://pipx.pypa.io/):
 
 ```bash
-git clone https://github.com/m-hosseinpour/agent-memory.git
-cd agent-memory
-uv tool install .
+uv tool install agent-memory      # or: pipx install agent-memory
+mem --version
 ```
 
-After pulling an update to this checkout, refresh the installed command:
-
-```bash
-uv tool install --reinstall .
-```
+One console script, no per-agent plugin. Upgrade with `uv tool upgrade agent-memory` (or
+`pipx upgrade agent-memory`), pin a release with `agent-memory==0.4.0`, and run the server without
+installing it with `uvx --from agent-memory mem mcp`.
 
 For Claude Code, connect the MCP server with:
 
@@ -51,11 +48,11 @@ claude mcp add mem mem mcp --scope user
 
 For OpenCode, DSH, and other MCP clients, use the configuration examples in [MCP](#mcp).
 
-For an agent without an MCP client, copy the manual connection guide into the store:
+For an agent without an MCP client, write the manual connection guide into the store:
 
 ```bash
 mkdir -p ~/.agents/memory
-cp PROTOCOL.md ~/.agents/memory/
+mem protocol > ~/.agents/memory/PROTOCOL.md
 ```
 
 The store is created on the first write at `~/.agents/memory`. See
@@ -65,7 +62,21 @@ For Claude Code, also set `"autoMemoryEnabled": false` in `~/.claude/settings.js
 native memory continues writing separately. More detail is in [`docs/design.md`](docs/design.md)
 §9–§10.
 
-For development, run the checkout directly without installing:
+To work on the code, use a checkout and install that instead:
+
+```bash
+git clone https://github.com/m-hosseinpour/agent-memory.git
+cd agent-memory
+uv tool install .
+```
+
+After pulling an update to the checkout, refresh the installed command:
+
+```bash
+uv tool install --reinstall .
+```
+
+The checkout also runs without any install:
 
 ```bash
 python -m memlib --help      # every platform
@@ -155,6 +166,7 @@ mem dream                     # a manual consolidation pass
 mem dream --all               # every project scope
 mem migrate --dry-run         # Claude Code notes: preview, write nothing
 mem mcp                       # the MCP server on stdio
+mem protocol                  # print PROTOCOL.md, the hand-wiring guide
 mem --version
 ```
 
@@ -228,7 +240,7 @@ half of a pair gets deleted.
 
 ```
 $MEM_ROOT/
-├── PROTOCOL.md                # copied here by hand; no code creates it
+├── PROTOCOL.md                # optional, for hand-wired agents: mem protocol > PROTOCOL.md
 ├── global/{MEMORY.md,*.md}    # user-wide preferences and facts
 └── projects/<slug>/{MEMORY.md,*.md}
 ```
@@ -280,7 +292,8 @@ memlib/dream.py      consolidation, called after every change and by `mem dream`
 memlib/mcp.py        MCP stdio server: memory_index / memory_read / memory_write
 memlib/migrate.py    import Claude Code's per-project notes and rebuild the index
 memlib/cli.py        argparse surface
-PROTOCOL.md          the agent-facing contract, copied into the store root
+memlib/PROTOCOL.md   the agent-facing contract; `mem protocol` prints it into the store
+.github/workflows/   the test suite on Linux and Windows, and the tag-triggered release
 docs/                research.md, design.md, roadmap.md, operations.md
 tests/               unittest (stdlib only)
 ```
@@ -298,6 +311,12 @@ On Windows:
 $env:MEM_ROOT = Join-Path $env:TEMP "mem-test"
 python -m unittest discover -s tests -v
 ```
+
+A release is a tag. Bump `__version__` in `memlib/__init__.py`, commit, and push `v<version>`:
+GitHub Actions runs the suite on Linux and Windows, builds the wheel and the sdist, uploads them
+to PyPI through Trusted Publishing, and creates the GitHub Release with both files attached
+(`.github/workflows/release.yml`). The one-time PyPI setup is in
+[`docs/operations.md`](docs/operations.md).
 
 Background and rationale: [`docs/`](docs/) — `research.md` (how Claude Code and Qoder actually
 work, and which claims are verified), `design.md` (the design and the alternatives dropped),
@@ -339,8 +358,8 @@ README and `PROTOCOL.md` are English; the documents under `docs/` are Persian.
   a shared or network-backed store is not safe to write from two agents. Copy
   `~/.agents/memory` elsewhere on a schedule if you want a backup; the tool will not do it.
 - **`PROTOCOL.md` is not part of the agent's onboarding.** The MCP `instructions` field is. The
-  protocol file is only for connecting an agent that has no MCP client, and the server never
-  exposes it as a tool or a resource.
+  protocol file is only for connecting an agent that has no MCP client; it ships inside the
+  package and `mem protocol` prints it, but the server never exposes it as a tool or a resource.
 - When testing, set `MEM_ROOT` to a scratch directory. The default root is the real store.
 
 ## License

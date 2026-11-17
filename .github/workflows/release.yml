@@ -1,0 +1,83 @@
+name: release
+
+# A pushed vX.Y.Z tag is the release: tests on Linux and Windows, a build, a
+# PyPI upload through Trusted Publishing, and a GitHub Release with both
+# artifacts. The version lives in memlib/__init__.py and must match the tag.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: the tag must match the package version
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, ".")
+          import memlib
+          tag = os.environ["GITHUB_REF_NAME"]
+          expected = "v" + memlib.__version__
+          if tag != expected:
+              raise SystemExit(f"tag {tag!r} does not match the package version {expected!r}")
+          PY
+      - name: build
+        run: uv build
+      - name: install the wheel into a clean environment and run it
+        run: |
+          uv venv /tmp/wheel-check
+          uv pip install --python /tmp/wheel-check/bin/python dist/*.whl
+          /tmp/wheel-check/bin/mem --version
+          /tmp/wheel-check/bin/mem protocol > /tmp/PROTOCOL.md
+          test -s /tmp/PROTOCOL.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # The name here must match the environment configured on PyPI's trusted
+    # publisher for this repository.
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: publish the GitHub Release with the wheel and the sdist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes

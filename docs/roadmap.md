@@ -105,13 +105,27 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
 - README بازچینش شد (Install و MCP بالای «استفادهٔ دستی»)، بخش ویندوز گرفت، لایسنس MIT و
   متادیتای کامل `pyproject.toml` اضافه شد.
 
+## ۰.۴.۰ — انتشار روی PyPI
+
+- `PROTOCOL.md` از ریشهٔ مخزن به `memlib/` رفت و داخل wheel هم می‌رود؛ `mem protocol` آن را چاپ
+  می‌کند تا کاربری که از PyPI نصب می‌کند هم راهنمای اتصال دستی را داشته باشد. کد خودش فایل را
+  در انبار نمی‌سازد؛ خروجی را shell می‌نویسد (design §۱۱).
+- `.github/workflows/ci.yml`: تست روی لینوکس و ویندوز با پایتون ۳٫۱۱ تا ۳٫۱۳، به‌علاوهٔ ساختن
+  wheel و sdist و اجرای `mem` از wheel نصب‌شده.
+- `.github/workflows/release.yml`: با push تگ `v<نسخه>` — تست، تطبیق تگ با `memlib.__version__`،
+  بیلد، انتشار روی PyPI با Trusted Publishing، و GitHub Release با هر دو artifact. هیچ توکنی
+  ذخیره نمی‌شود.
+- README از «clone و `uv tool install .`» به `uv tool install agent-memory` (یا `pipx`) تغییر
+  کرد و نصب از چک‌اوت به بخش توسعه رفت. روش ریلیز در `operations.md` است.
+
 ## آنچه در پایان ماند
 
 | جزء | وضعیت |
 |---|---|
 | انبار markdown + `MEMORY.md` | هست |
-| `mem` CLI | هست (`write`, `read`, `list`, `forget`, `index`, `mcp`, `dream`, `migrate`) |
+| `mem` CLI | هست (`write`, `read`, `list`, `forget`, `index`, `mcp`, `protocol`, `dream`, `migrate`) |
 | سرور MCP | هست (`memory_index`, `memory_read`, `memory_write`) |
+| توزیع | هست: wheel/sdist روی PyPI و GitHub Release، با تست CI روی لینوکس و ویندوز |
 | تثبیت بعد از هر تغییر | هست، قطعی، idempotent |
 | بازیابی لغوی / انتخاب‌گر | نیست (حذف شد) |
 | سقف خط فهرست | نیست (حذف شد) |
