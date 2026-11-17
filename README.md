@@ -282,7 +282,11 @@ Everything above works unchanged; the differences are the shell and a few file-s
   still garble non-ASCII output when it reads a native command; use PowerShell 7+, or run
   `[Console]::OutputEncoding = [Text.Encoding]::UTF8` once per session. The same applies to
   saving the guide: PS 5.1's `>` writes UTF-16, so use
-  `mem protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md` there.
+
+  ```powershell
+  New-Item -ItemType Directory -Force -Path $HOME\.agents\memory
+  mem protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md
+  ```
 
 ## Development
 

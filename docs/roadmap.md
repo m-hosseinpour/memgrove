@@ -111,7 +111,7 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
   می‌کند تا کاربری که از PyPI نصب می‌کند هم راهنمای اتصال دستی را داشته باشد. کد خودش فایل را
   در انبار نمی‌سازد؛ خروجی را shell می‌نویسد (design §۱۱).
 - `.github/workflows/ci.yml`: تست روی لینوکس و ویندوز با پایتون ۳٫۱۱ تا ۳٫۱۴، به‌علاوهٔ ساختن
-  wheel و sdist و اجرای `mem` از wheel نصب‌شده.
+  wheel و sdist و نصب و اجرای هر دو در محیط تمیز.
 - `.github/workflows/release.yml`: با push تگ `v<نسخه>` — تست، تطبیق تگ با `memlib.__version__`،
   بیلد، انتشار روی PyPI با Trusted Publishing، و GitHub Release با هر دو artifact. هیچ توکنی
   ذخیره نمی‌شود.

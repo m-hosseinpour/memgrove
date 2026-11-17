@@ -85,9 +85,9 @@ workflow انتشار ([`release.yml`](../.github/workflows/release.yml)) با p
 
 ```bash
 # پس از بامپ __version__ و سبز شدن تست‌ها
-git add -A && git commit -m "Release <version>"
-git tag v<version>
-git push origin main && git push origin v<version>
+git add -A && git commit -m "Release X.Y.Z"
+git tag vX.Y.Z
+git push origin main && git push origin vX.Y.Z
 ```
 
 ترتیب کارها در workflow:
