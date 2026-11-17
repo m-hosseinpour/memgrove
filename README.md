@@ -12,6 +12,7 @@ MCP gives connected agents tools to read and write notes; it does not record eve
 automatically. Agents choose what is worth remembering and retrieve notes when relevant.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/memgrove.svg)](https://pypi.org/project/memgrove/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 
 - **One memory store, multiple agents:** keep project-specific notes separate from user-wide

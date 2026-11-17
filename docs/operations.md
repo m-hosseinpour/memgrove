@@ -125,7 +125,8 @@ git push origin main && git push origin vX.Y.Z
 
 نام `memgrove` تا ۲۰۲۶-۱۱-۱۷ روی PyPI آزاد بود (`/pypi/memgrove/json` → 404)؛ همان
 pending publisher نام را رزرو می‌کند و بعد از اولین انتشار به trusted publisher عادی تبدیل
-می‌شود. اگر روزی workflow یا environment تغییر کرد، همین رکورد را به‌روز کنید، نه اینکه توکن
+می‌شود. اولین انتشار در ۲۰۲۶-۱۱-۱۷ با تگ `v0.4.0` انجام شد (wheel و sdist روی PyPI و GitHub
+Release). اگر روزی workflow یا environment تغییر کرد، همین رکورد را به‌روز کنید، نه اینکه توکن
 دستی بسازید.
 
 نام قبلی `agent-memory` را PyPI رد می‌کند: چکِ «too similar» اسم را با تابع `ultranormalize_name`
