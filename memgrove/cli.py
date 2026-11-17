@@ -206,7 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="memgrove", description="Local-first Markdown memory for coding agents"
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("--root", help="override the memory root (default ~/.agents/memory)")
+    parser.add_argument("--root", help="override the memory root (default ~/.agents/memgrove)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_scope(p):

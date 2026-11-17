@@ -6,7 +6,8 @@
 
 ## P0 — انبار + CLI
 
-ساخته شد: ساختار `~/.agents/memory/`، قالب فایل و فهرست، `memgrove` با `write`/`read`/`list`/
+ساخته شد: ساختار `~/.agents/memory/` (که بعداً در ۰.۴.۰ به `~/.agents/memgrove/` رفت)، قالب فایل و
+فهرست، `memgrove` با `write`/`read`/`list`/
 `forget`/`index`، نسخه‌بندی خوش‌بینانه، رد راز، سقف ۱۰۰KB.
 
 ## P1 — آداپتورها
@@ -122,8 +123,9 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
   خودِ `agentmemory` که پروژه‌ای موجود است) «too similar» رد می‌کند. با این تغییر، نام پکیج،
   ماژول (`memgrove/`)، دستور (`memgrove`)، نام سرور MCP و سه ابزار آن (`memgrove_index`،
   `memgrove_read`، `memgrove_write`) و ورودی‌ها (`MEMGROVE_ROOT`، `MEMGROVE_PROJECT_CWD`) یکی
-  شدند. مسیر انبار (`~/.agents/memory`)، فایل `MEMORY.md`، قالب یادداشت و اسلاگ scope عوض
-  نشدند: آن‌ها قرارداد داده‌اند، نه نام ابزار.
+  شدند. خود انبار در آن کامیت دست‌نخورده ماند و بعد در همین نسخه از `~/.agents/memory` به
+  `~/.agents/memgrove` منتقل شد؛ اما `MEMORY.md`، قالب یادداشت و اسلاگ scope عوض نشدند: آن‌ها
+  قرارداد داده‌اند، نه نام ابزار.
 
 ## آنچه در پایان ماند
 

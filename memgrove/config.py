@@ -1,6 +1,6 @@
 """Paths: the store root and the two scope directories.
 
-Root defaults to `~/.agents/memory` and can be overridden with `MEMGROVE_ROOT`, or
+Root defaults to `~/.agents/memgrove` and can be overridden with `MEMGROVE_ROOT`, or
 with `--root` on the CLI. There is no config file: the store has no tunables
 left, so a file that could only restate the defaults was removed.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-DEFAULT_ROOT = "~/.agents/memory"
+DEFAULT_ROOT = "~/.agents/memgrove"
 
 
 def root() -> Path:

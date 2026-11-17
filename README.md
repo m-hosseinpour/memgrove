@@ -52,11 +52,11 @@ For OpenCode, DSH, and other MCP clients, use the configuration examples in [MCP
 For an agent without an MCP client, write the manual connection guide into the store:
 
 ```bash
-mkdir -p ~/.agents/memory
-memgrove protocol > ~/.agents/memory/PROTOCOL.md
+mkdir -p ~/.agents/memgrove
+memgrove protocol > ~/.agents/memgrove/PROTOCOL.md
 ```
 
-The store is created on the first write at `~/.agents/memory`. See
+The store is created on the first write at `~/.agents/memgrove`. See
 [Migrating from Claude Code](#migrating-from-claude-code) to import existing notes.
 
 For Claude Code, also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`; otherwise its
@@ -364,7 +364,7 @@ README and `PROTOCOL.md` are English; the documents under `docs/` are Persian.
 - **The store is local to one machine.** There is no remote, no sync and no backup inside the
   tool: the version token and the short-lived lock only protect writers on the same machine, and
   a shared or network-backed store is not safe to write from two agents. Copy
-  `~/.agents/memory` elsewhere on a schedule if you want a backup; the tool will not do it.
+  `~/.agents/memgrove` elsewhere on a schedule if you want a backup; the tool will not do it.
 - **`PROTOCOL.md` is not part of the agent's onboarding.** The MCP `instructions` field is. The
   protocol file is only for connecting an agent that has no MCP client; it ships inside the
   package and `memgrove protocol` prints it, but the server never exposes it as a tool or a

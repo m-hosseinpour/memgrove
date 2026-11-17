@@ -11,7 +11,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 - pytest is neither installed nor needed; new tests go in the four existing files under `tests/`
   and use `unittest`.
 - Every `memgrove` command in a test or a check needs `MEMGROVE_ROOT=$(mktemp -d)`. The real
-  store is `~/.agents/memory` and must not be touched.
+  store is `~/.agents/memgrove` and must not be touched.
 - `./bin/memgrove` runs the checkout on POSIX, `bin\memgrove.cmd` on Windows; `python -m
   memgrove` works on both. `memgrove` on `PATH` is the installed copy and may be stale; to run the
   new code there you need `uv tool install --reinstall .` (see below).
