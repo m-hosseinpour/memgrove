@@ -70,10 +70,16 @@ def default_source() -> Path:
 def _claude_slug(cwd: str) -> str:
     """Claude Code's directory name for a cwd: non-alphanumerics become `-`.
 
-    `normcase` makes the comparison case-insensitive on Windows, where the same
-    directory can be named with any casing; on POSIX it changes nothing.
+    The name keeps the path's own casing; comparisons normalize both sides with
+    `os.path.normcase`, because Windows can name the same directory with any
+    casing while this function's output must match what it named.
     """
-    return re.sub(r"[^A-Za-z0-9]", "-", os.path.normcase(os.path.abspath(cwd)))
+    return re.sub(r"[^A-Za-z0-9]", "-", os.path.abspath(cwd))
+
+
+def _same_claude_name(directory: str, cwd: str) -> bool:
+    """Whether a Claude project directory is the one Claude would name for cwd."""
+    return os.path.normcase(directory) == os.path.normcase(_claude_slug(cwd))
 
 
 def _mtime(path: Path) -> float:
@@ -141,8 +147,8 @@ def _projects(source: Path) -> list[Project]:
     # The canonical directory (the one named after the cwd) wins the file-name
     # race over an `ssh-<id>` directory that records the same cwd.
     def order(project: Project) -> tuple[bool, bool, str]:
-        canonical = project.cwd is not None and (
-            project.memory.parent.name == _claude_slug(project.cwd)
+        canonical = project.cwd is not None and _same_claude_name(
+            project.memory.parent.name, project.cwd
         )
         return (project.cwd is None, not canonical, str(project.memory))
 
@@ -164,8 +170,7 @@ def _one_project(source: Path | None, cwd: str) -> list[Project]:
         and os.path.realpath(project.cwd) == os.path.realpath(wanted)
     ]
     if not matches:
-        name = _claude_slug(wanted)
-        matches = [p for p in projects if p.memory.parent.name == name]
+        matches = [p for p in projects if _same_claude_name(p.memory.parent.name, wanted)]
     if not matches:
         raise store.StoreError(f"no Claude Code memory directory for {wanted} under {root}")
     # The caller supplied the real path, so even a name-only match gets a
