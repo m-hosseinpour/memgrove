@@ -39,7 +39,7 @@ jobs:
           uv pip install --python /tmp/wheel-check/bin/python dist/*.whl
           /tmp/wheel-check/bin/mem --version
           /tmp/wheel-check/bin/mem protocol > /tmp/PROTOCOL.md
-          test -s /tmp/PROTOCOL.md
+          cmp /tmp/PROTOCOL.md memlib/PROTOCOL.md
       - uses: actions/upload-artifact@v7
         with:
           name: dist

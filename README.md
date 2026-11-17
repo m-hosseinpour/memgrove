@@ -37,8 +37,8 @@ mem --version
 ```
 
 One console script, no per-agent plugin. Upgrade with `uv tool upgrade agent-memory` (or
-`pipx upgrade agent-memory`), pin a release with `agent-memory==0.4.0`, and run the server without
-installing it with `uvx --from agent-memory mem mcp`.
+`pipx upgrade agent-memory`), pin a release with `agent-memory==<version>`, and run the server
+without installing it with `uvx --from agent-memory mem mcp`.
 
 For Claude Code, connect the MCP server with:
 
@@ -240,7 +240,7 @@ half of a pair gets deleted.
 
 ```
 $MEM_ROOT/
-├── PROTOCOL.md                # optional, for hand-wired agents: mem protocol > PROTOCOL.md
+├── PROTOCOL.md                # optional, for hand-wired agents; `mem protocol` prints it
 ├── global/{MEMORY.md,*.md}    # user-wide preferences and facts
 └── projects/<slug>/{MEMORY.md,*.md}
 ```
@@ -259,8 +259,9 @@ running.
 
 Everything above works unchanged; the differences are the shell and a few file-system rules.
 
-- Install with the same `uv tool install .` in PowerShell. `mem.exe` lands on `PATH`; open a new
-  terminal so the PATH update is visible (`Get-Command mem` confirms it).
+- Install with `uv tool install agent-memory` (or `pipx install agent-memory`) in PowerShell;
+  `uv tool install .` is the checkout form from [Install](#install). `mem.exe` lands on `PATH`;
+  open a new terminal so the PATH update is visible (`Get-Command mem` confirms it).
 - There is no bash requirement. Use the installed `mem`, `python -m memlib`, or `bin\mem.cmd`
   as the no-install launcher.
 - README shell examples use bash heredocs. In PowerShell, pass the body inline or from a file:
@@ -279,7 +280,9 @@ Everything above works unchanged; the differences are the shell and a few file-s
   home directory, with the same JSON/YAML shown above.
 - The CLI prints UTF-8 JSON regardless of the console code page. Windows PowerShell 5.1 can
   still garble non-ASCII output when it reads a native command; use PowerShell 7+, or run
-  `[Console]::OutputEncoding = [Text.Encoding]::UTF8` once per session.
+  `[Console]::OutputEncoding = [Text.Encoding]::UTF8` once per session. The same applies to
+  saving the guide: PS 5.1's `>` writes UTF-16, so use
+  `mem protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md` there.
 
 ## Development
 
@@ -292,7 +295,7 @@ memlib/dream.py      consolidation, called after every change and by `mem dream`
 memlib/mcp.py        MCP stdio server: memory_index / memory_read / memory_write
 memlib/migrate.py    import Claude Code's per-project notes and rebuild the index
 memlib/cli.py        argparse surface
-memlib/PROTOCOL.md   the agent-facing contract; `mem protocol` prints it into the store
+memlib/PROTOCOL.md   the agent-facing contract; `mem protocol` prints it, the shell saves it
 .github/workflows/   the test suite on Linux and Windows, and the tag-triggered release
 docs/                research.md, design.md, roadmap.md, operations.md
 tests/               unittest (stdlib only)

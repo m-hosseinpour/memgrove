@@ -85,9 +85,9 @@ workflow انتشار ([`release.yml`](../.github/workflows/release.yml)) با p
 
 ```bash
 # پس از بامپ __version__ و سبز شدن تست‌ها
-git add -A && git commit -m "Release 0.4.0"
-git tag v0.4.0
-git push origin main && git push origin v0.4.0
+git add -A && git commit -m "Release <version>"
+git tag v<version>
+git push origin main && git push origin v<version>
 ```
 
 ترتیب کارها در workflow:
@@ -118,15 +118,20 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 
 - انتشار روی PyPI برگشت‌ناپذیر است: نام و شمارهٔ نسخهٔ منتشرشده پاک نمی‌شوند. برای تمرین از
   TestPyPI استفاده کنید، نه از یک شمارهٔ نسخهٔ واقعی.
-- گیت‌هاب تنها جای اجرای workflow است؛ پس تگ باید روی mirror گیت‌هاب هم برود (`origin` این
-  مخزن گیت‌سرور دیگری است).
+- گیت‌هاب تنها جای اجرای workflow است. `origin` دو URL دارد (گیت‌سرور خودمان و گیت‌هاب)، پس
+  همان `git push origin main` و `git push origin v<version>` هر دو مقصد را به‌روز می‌کند — به
+  شرطی که تگ‌ها هم push شوند. اگر کامیت یا تگ برای اولین بار فایل `.github/workflows/` را روی
+  گیت‌هاب می‌سازد، توکن باید scope `workflow` داشته باشد؛ وگرنه گیت‌هاب push را با
+  `refusing to allow a Personal Access Token to create or update workflow ... without workflow
+  scope` رد می‌کند و تگ اصلاً نمی‌رسد، پس هیچ ریلیزی اجرا نمی‌شود.
 - اگر job پیش از آپلود شکست خورد، همان اجرا را از تب Actions دوباره اجرا کنید (rerun). اگر PyPI
   نسخه را گرفت و Release ساخته نشد، Release را دستی از همان artifact بسازید. PyPI نسخهٔ تکراری
   را با `400 File already exists` رد می‌کند، پس برای همان نسخه تگ را دوباره push نکنید.
 
 ## ویندوز
 
-- نصب همان `uv tool install .` است و `mem.exe` روی `PATH` می‌آید؛ `python -m memlib` هم همان
+- نصب از PyPI همان `uv tool install agent-memory` است و `mem.exe` روی `PATH` می‌آید؛
+  `uv tool install .` فقط برای نصب از چک‌اوت است. `python -m memlib` هم همان
   CLI است. `bin/mem` مخصوص bash است و `bin\mem.cmd` معادل ویندوزیِ بدون نصب.
 - قفل scope در ویندوز روی یک بایت از `<scope>/.mem.lock` است، چون ویندوز هندل پوشه را قفل
   نمی‌کند. فایل state نیست: با مرگ پروسه آزاد می‌شود و `MEMORY.md` آن را نمی‌بیند.

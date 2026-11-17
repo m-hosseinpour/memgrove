@@ -62,7 +62,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 - Never upload by hand and never store a PyPI token: the one-time trusted-publisher setup is in
   `docs/operations.md`. Publishing is irreversible — a name and a version cannot be reused; rehearse
   on TestPyPI instead.
-- The workflow runs on GitHub only, so the tag must be pushed there as well, not just to `origin`.
+- The workflow runs on GitHub only. `origin` carries both push URLs (our own git server and
+  GitHub), so `git push origin main` and `git push origin v<version>` update both — the tag has to
+  be pushed too. A push that first adds `.github/workflows/` to GitHub needs a token with the
+  `workflow` scope; without it GitHub rejects the push and the tag never lands, so no release runs.
 
 ## Git
 

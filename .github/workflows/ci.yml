@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ["3.11", "3.12", "3.13"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -35,10 +35,13 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
       - name: build the wheel and the sdist
         run: uv build
-      - name: install the wheel into a clean environment and run it
+      - name: install each artifact into a clean environment and run it
         run: |
-          uv venv /tmp/wheel-check
-          uv pip install --python /tmp/wheel-check/bin/python dist/*.whl
-          /tmp/wheel-check/bin/mem --version
-          /tmp/wheel-check/bin/mem protocol > /tmp/PROTOCOL.md
-          test -s /tmp/PROTOCOL.md
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            target="/tmp/check-$(basename "$artifact")"
+            uv venv "$target"
+            uv pip install --python "$target/bin/python" "$artifact"
+            "$target/bin/mem" --version
+            "$target/bin/mem" protocol > "$target/PROTOCOL.md"
+            cmp "$target/PROTOCOL.md" memlib/PROTOCOL.md
+          done
