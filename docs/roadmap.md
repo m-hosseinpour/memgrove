@@ -5,6 +5,21 @@ rejected live in [`design.md`](design.md); the evidence behind them in [`researc
 Versions before 0.4.0 were not tagged, so those sections group the work by the version in the code
 at the end of each phase.
 
+## 0.4.1 — documentation restructure (2026-11-17)
+
+- `README.md` cut from 380 lines to about 120: it now carries only the path a new reader follows
+  first — install, connect an agent, and a check that it works — plus a map of the documents.
+- Detail moved to three documents with one job each: `docs/agents.md` (MCP configuration per
+  client and the `instructions` contract), `docs/usage.md` (CLI, exit codes, consolidation, store
+  layout, the Claude Code import) and `docs/windows.md`.
+- Removed the README's design-notes list (all of it was already in `docs/design.md`), the package
+  map and the release steps (`AGENTS.md` holds the rules). Documentation links are absolute so the
+  description renders with working links on PyPI.
+- Corrected the OpenCode sample: current OpenCode reads `mcp.servers` and has no `enabled` key
+  (a server is enabled unless `disabled`), so an older sample could fail schema validation.
+- No store, CLI or MCP behaviour changed; this release exists so the PyPI description matches the
+  repository README.
+
 ## 0.4.0 — first public release (2026-11-17)
 
 - Published as `memgrove` on PyPI, with the wheel and the sdist attached to the GitHub Release.
