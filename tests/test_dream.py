@@ -1,6 +1,6 @@
-"""Tests for consolidation: `mem dream` and the pass after every change.
+"""Tests for consolidation: `memgrove dream` and the pass after every change.
 
-Every test gets its own MEM_ROOT. Timestamps are written by hand instead of
+Every test gets its own MEMGROVE_ROOT. Timestamps are written by hand instead of
 using `store.write`, because "newer wins" is exactly what most of these cases
 turn on and the wall clock is not a usable input for that.
 """
@@ -17,7 +17,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from memlib import config, dream, index, store
+from memgrove import config, dream, index, store
 
 OLD = "2026-10-01T00:00:00.000Z"
 NEW = "2026-10-02T00:00:00.000Z"
@@ -25,19 +25,19 @@ NEW = "2026-10-02T00:00:00.000Z"
 
 class DreamTestCase(unittest.TestCase):
     def setUp(self):
-        self.root = Path(tempfile.mkdtemp(prefix="mem-dream-"))
+        self.root = Path(tempfile.mkdtemp(prefix="memgrove-dream-"))
         self.addCleanup(shutil.rmtree, self.root, True)
-        self._old_root = os.environ.get("MEM_ROOT")
-        os.environ["MEM_ROOT"] = str(self.root)
+        self._old_root = os.environ.get("MEMGROVE_ROOT")
+        os.environ["MEMGROVE_ROOT"] = str(self.root)
         self.addCleanup(self._restore_root)
         self.cwd = self.root / "project"
         self.cwd.mkdir()
 
     def _restore_root(self):
         if self._old_root is None:
-            os.environ.pop("MEM_ROOT", None)
+            os.environ.pop("MEMGROVE_ROOT", None)
         else:
-            os.environ["MEM_ROOT"] = self._old_root
+            os.environ["MEMGROVE_ROOT"] = self._old_root
 
     # -- helpers ---------------------------------------------------------
 

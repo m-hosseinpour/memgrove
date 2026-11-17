@@ -18,26 +18,26 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from memlib import cli, config, store
+from memgrove import cli, config, store
 
 WRITE_KEYS = {"ok", "path", "version", "modified"}
 
 
 class CliTestCase(unittest.TestCase):
     def setUp(self):
-        self.root = Path(tempfile.mkdtemp(prefix="mem-cli-"))
+        self.root = Path(tempfile.mkdtemp(prefix="memgrove-cli-"))
         self.addCleanup(shutil.rmtree, self.root, True)
-        self._old_root = os.environ.get("MEM_ROOT")
-        os.environ["MEM_ROOT"] = str(self.root)
+        self._old_root = os.environ.get("MEMGROVE_ROOT")
+        os.environ["MEMGROVE_ROOT"] = str(self.root)
         self.addCleanup(self._restore_root)
         self.cwd = self.root / "project"
         self.cwd.mkdir()
 
     def _restore_root(self):
         if self._old_root is None:
-            os.environ.pop("MEM_ROOT", None)
+            os.environ.pop("MEMGROVE_ROOT", None)
         else:
-            os.environ["MEM_ROOT"] = self._old_root
+            os.environ["MEMGROVE_ROOT"] = self._old_root
 
     # -- helpers ---------------------------------------------------------
 
@@ -341,7 +341,7 @@ class IndexTests(CliTestCase):
 
 
 class MigrateTests(CliTestCase):
-    """`mem migrate` imports Claude Code's per-project memory notes."""
+    """`memgrove migrate` imports Claude Code's per-project memory notes."""
 
     def claude_projects(self):
         return self.root / "claude" / "projects"
@@ -550,7 +550,7 @@ class MigrateTests(CliTestCase):
         self.assertEqual(code, 0)
         self.assertTrue((config.scope_dir("project", str(dotted)) / "a.md").is_file())
         # Claude Code's own directory name would be "...-my-project"; a note
-        # there would never be read by `mem --cwd /.../my.project`.
+        # there would never be read by `memgrove --cwd /.../my.project`.
         self.assertFalse(
             (config.root() / "projects" / self.claude_slug(dotted) / "a.md").exists()
         )
@@ -694,7 +694,7 @@ class ConsolidationOnChangeTests(CliTestCase):
     def test_a_tied_timestamp_keeps_the_note_just_written(self):
         # Same name and the same millisecond: the tiebreak sorts by file name,
         # and "a.md" < "z.md" would delete the file that was just written.
-        with mock.patch("memlib.store.now_iso", return_value="2026-10-02T00:00:00.000Z"):
+        with mock.patch("memgrove.store.now_iso", return_value="2026-10-02T00:00:00.000Z"):
             self.create("z.md", "old body", name="shared")
             written = self.create("a.md", "new body", name="shared")
         self.assertTrue((self.project_dir() / "a.md").exists())
@@ -710,7 +710,7 @@ class ProtocolTests(CliTestCase):
         code, text = self.run_cli("protocol")
         self.assertEqual(code, 0)
         self.assertEqual(text, shipped.read_text(encoding="utf-8"))
-        self.assertIn("memory_index", text)
+        self.assertIn("memgrove_index", text)
         # A guide, not the JSON contract the mutating commands follow.
         self.assertFalse(text.lstrip().startswith("{"))
 

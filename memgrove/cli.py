@@ -5,7 +5,7 @@ Everything an agent does goes through the MCP server, which is this module's
 
 * a human (or a hookless agent) running the same operations by hand;
 * `PROTOCOL.md`, the written contract for an agent that has no MCP client, which
-  `mem protocol` prints so an installed package carries it too.
+  `memgrove protocol` prints so an installed package carries it too.
 
 Output convention: mutating and query commands print JSON; `index` prints text
 meant to be read, not parsed.
@@ -156,9 +156,9 @@ def cmd_protocol(args) -> int:
     """Print the shipped guide, so the copy in the store matches this version.
 
     A package installed from PyPI has no checkout to copy the file from, so the
-    guide travels inside `memlib` and the shell redirects it into the store.
+    guide travels inside `memgrove` and the shell redirects it into the store.
     """
-    guide = resources.files("memlib").joinpath("PROTOCOL.md")
+    guide = resources.files("memgrove").joinpath("PROTOCOL.md")
     sys.stdout.write(guide.read_text(encoding="utf-8"))
     return 0
 
@@ -202,7 +202,9 @@ class _Parser(argparse.ArgumentParser):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="mem", description="Agent-agnostic memory store")
+    parser = _Parser(
+        prog="memgrove", description="Local-first Markdown memory for coding agents"
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--root", help="override the memory root (default ~/.agents/memory)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -298,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     if getattr(args, "root", None):
         import os
 
-        os.environ["MEM_ROOT"] = args.root
+        os.environ["MEMGROVE_ROOT"] = args.root
     try:
         return args.func(args)
     except store.ConflictError as exc:

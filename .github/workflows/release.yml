@@ -2,7 +2,7 @@ name: release
 
 # A pushed vX.Y.Z tag is the release: tests on Linux and Windows, a build, a
 # PyPI upload through Trusted Publishing, and a GitHub Release with both
-# artifacts. The version lives in memlib/__init__.py and must match the tag.
+# artifacts. The version lives in memgrove/__init__.py and must match the tag.
 on:
   push:
     tags: ["v*"]
@@ -25,9 +25,9 @@ jobs:
           python3 - <<'PY'
           import os, sys
           sys.path.insert(0, ".")
-          import memlib
+          import memgrove
           tag = os.environ["GITHUB_REF_NAME"]
-          expected = "v" + memlib.__version__
+          expected = "v" + memgrove.__version__
           if tag != expected:
               raise SystemExit(f"tag {tag!r} does not match the package version {expected!r}")
           PY
@@ -37,9 +37,9 @@ jobs:
         run: |
           uv venv /tmp/wheel-check
           uv pip install --python /tmp/wheel-check/bin/python dist/*.whl
-          /tmp/wheel-check/bin/mem --version
-          /tmp/wheel-check/bin/mem protocol > /tmp/PROTOCOL.md
-          cmp /tmp/PROTOCOL.md memlib/PROTOCOL.md
+          /tmp/wheel-check/bin/memgrove --version
+          /tmp/wheel-check/bin/memgrove protocol > /tmp/PROTOCOL.md
+          cmp /tmp/PROTOCOL.md memgrove/PROTOCOL.md
       - uses: actions/upload-artifact@v7
         with:
           name: dist

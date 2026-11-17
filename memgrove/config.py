@@ -1,6 +1,6 @@
 """Paths: the store root and the two scope directories.
 
-Root defaults to `~/.agents/memory` and can be overridden with `MEM_ROOT`, or
+Root defaults to `~/.agents/memory` and can be overridden with `MEMGROVE_ROOT`, or
 with `--root` on the CLI. There is no config file: the store has no tunables
 left, so a file that could only restate the defaults was removed.
 """
@@ -14,7 +14,7 @@ DEFAULT_ROOT = "~/.agents/memory"
 
 
 def root() -> Path:
-    override = os.environ.get("MEM_ROOT")
+    override = os.environ.get("MEMGROVE_ROOT")
     if override:
         return Path(os.path.expanduser(override))
     return Path(os.path.expanduser(DEFAULT_ROOT))
@@ -29,7 +29,7 @@ def project_dir(slug: str) -> Path:
 
     An importer must pass `slug_for(real_cwd)`, not a directory name copied
     from another tool: Claude Code's names are lossy and would not match the
-    scope `mem --cwd` reads.
+    scope `memgrove --cwd` reads.
     """
     return root() / "projects" / slug
 

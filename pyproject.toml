@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-memory"
+name = "memgrove"
 dynamic = ["version"]
 description = "Local-first persistent Markdown memory for AI coding agents, shared across MCP-compatible clients"
 readme = "README.md"
@@ -13,7 +13,6 @@ license-files = ["LICENSE"]
 authors = [{ name = "Mahdi Hosseinpour" }]
 keywords = [
   "ai-agents",
-  "agent-memory",
   "claude-code",
   "coding-agents",
   "deepseek",
@@ -41,14 +40,14 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/m-hosseinpour/agent-memory"
-Issues = "https://github.com/m-hosseinpour/agent-memory/issues"
+Homepage = "https://github.com/m-hosseinpour/memgrove"
+Issues = "https://github.com/m-hosseinpour/memgrove/issues"
 
 [project.scripts]
-mem = "memlib.cli:main"
+memgrove = "memgrove.cli:main"
 
 [tool.hatch.version]
-path = "memlib/__init__.py"
+path = "memgrove/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["memlib"]
+packages = ["memgrove"]

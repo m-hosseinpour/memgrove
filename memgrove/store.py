@@ -26,7 +26,7 @@ else:
 TYPES = ("user", "feedback", "project", "reference")
 DEFAULT_TYPE = "project"
 MAX_BODY_BYTES = 100 * 1024
-LOCK_FILE = ".mem.lock"
+LOCK_FILE = ".memgrove.lock"
 LOCK_TIMEOUT_SECONDS = 60
 
 _FM_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.S)
@@ -53,7 +53,7 @@ def _locked(directory: Path):
     On POSIX the lock is the directory's own inode: no file, no state, and the
     kernel drops it when the process exits. Windows cannot lock a directory
     handle, so there the lock is one byte of `LOCK_FILE` inside the scope. That
-    file is not state either: an unlocked `.mem.lock` is exactly as good as an
+    file is not state either: an unlocked `.memgrove.lock` is exactly as good as an
     absent one, and the OS releases the lock when the owning process dies.
 
     Without this lock the `if_version` check is a check-then-act: two writers

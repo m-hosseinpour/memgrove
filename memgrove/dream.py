@@ -1,7 +1,7 @@
 """Consolidation of the store, run after every change.
 
-`mem write` and `mem forget` call `after_change` on the scope they touched, and
-the same pass is reachable by hand as `mem dream` (with `--all` to walk every
+`memgrove write` and `memgrove forget` call `after_change` on the scope they touched, and
+the same pass is reachable by hand as `memgrove dream` (with `--all` to walk every
 project). There is no schedule, no session counter and no background process:
 a change is consolidated while the caller waits, so the store is never left in
 a state that needs a later janitor.
@@ -28,7 +28,7 @@ Concurrency: the pass itself takes no lock. It deletes a file only while its
 bytes still match what the pass read, and writes a merged keeper with the
 version it read, so a concurrent writer either wins cleanly or leaves both
 files for the next pass. `store.write` and `store.delete` do hold a short lock
-on the scope (the directory's inode on POSIX, one byte of `.mem.lock` on
+on the scope (the directory's inode on POSIX, one byte of `.memgrove.lock` on
 Windows); this pass runs after that lock is released and relies on the version
 re-checks. Rebuilding the index is atomic.
 """
@@ -302,7 +302,7 @@ def _warn(message: str) -> None:
     try:
         # No "dream" in the prefix: the same pass now runs after a write, where
         # naming a scheduler would only confuse whoever reads the log.
-        sys.stderr.write(f"mem: {message}\n")
+        sys.stderr.write(f"memgrove: {message}\n")
     except Exception:
         pass
 

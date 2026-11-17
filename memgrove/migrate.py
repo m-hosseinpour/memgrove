@@ -18,7 +18,7 @@ conversion, but a plain `cp` would still get five things wrong:
   becomes `-home-u--cache`, while this store keeps the dot. The real cwd is
   recorded in the project's session logs and is what this module uses; when it
   cannot be recovered the note is reported and skipped rather than written to
-  a scope no `mem` command will ever read.
+  a scope no `memgrove` command will ever read.
 
 Per project is the default scope: a note may say `type: feedback` and still be
 about one repository, and Claude Code kept it under one project. Promotion to

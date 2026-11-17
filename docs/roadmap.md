@@ -6,7 +6,7 @@
 
 ## P0 — انبار + CLI
 
-ساخته شد: ساختار `~/.agents/memory/`، قالب فایل و فهرست، `mem` با `write`/`read`/`list`/
+ساخته شد: ساختار `~/.agents/memory/`، قالب فایل و فهرست، `memgrove` با `write`/`read`/`list`/
 `forget`/`index`، نسخه‌بندی خوش‌بینانه، رد راز، سقف ۱۰۰KB.
 
 ## P1 — آداپتورها
@@ -77,7 +77,7 @@
 
 ## پس از ۰.۲.۰ — مهاجرت از Claude Code
 
-`mem migrate` اضافه شد: یادداشت‌های `<claude-config>/projects/*/memory/` را در scope پروژهٔ
+`memgrove migrate` اضافه شد: یادداشت‌های `<claude-config>/projects/*/memory/` را در scope پروژهٔ
 خودشان وارد می‌کند (`--global user,feedback` برای انتقال نوع‌های عمومی)، `MEMORY.md` را کنار
 می‌گذارد و از `store.write` رد می‌کند تا بررسی راز، سقف ۱۰۰KB و قواعد نام/بدنه اجرا شوند.
 scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می‌شود، چون نام پوشهٔ Claude Code برگشت‌پذیر
@@ -90,7 +90,7 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
 
 ## ۰.۳.۰ — ویندوز و انتشار عمومی
 
-- قفل scope در ویندوز روی یک بایت از `.mem.lock` است، چون ویندوز هندل پوشه را قفل نمی‌کند؛
+- قفل scope در ویندوز روی یک بایت از `.memgrove.lock` است، چون ویندوز هندل پوشه را قفل نمی‌کند؛
   POSIX همان inode پوشه می‌ماند و فایلی نمی‌سازد.
 - نوشتن همیشه LF است (`newline="\n"`) و خواندن CRLF و CR را هم می‌فهمد؛ بدنهٔ ورودی پیش از
   ذخیره یکسان می‌شود تا نسخهٔ یک یادداشت بین سیستم‌عامل‌ها یکی بماند.
@@ -99,32 +99,39 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
 - اسلاگ مسیر با `normcase` ساخته می‌شود تا یک پروژه در ویندوز دو scope نگیرد؛ `_claude_slug`
   هم برای مقایسهٔ نام پوشه همین کار را می‌کند.
 - CLI روی stdin/stdout/stderr با UTF-8 و بدون ترجمهٔ خط کار می‌کند (کنسول ویندوز در غیر این
-  صورت یادداشت فارسی را نمی‌نوشت) و `mem --version` اضافه شد.
-- `bin/mem.cmd` برای اجرای بدون نصب در ویندوز اضافه شد؛ `python -m memlib` مسیر مشترک هر دو
+  صورت یادداشت فارسی را نمی‌نوشت) و `memgrove --version` اضافه شد.
+- `bin/memgrove.cmd` برای اجرای بدون نصب در ویندوز اضافه شد؛ `python -m memgrove` مسیر مشترک هر دو
   سیستم‌عامل است.
 - README بازچینش شد (Install و MCP بالای «استفادهٔ دستی»)، بخش ویندوز گرفت، لایسنس MIT و
   متادیتای کامل `pyproject.toml` اضافه شد.
 
 ## ۰.۴.۰ — انتشار روی PyPI
 
-- `PROTOCOL.md` از ریشهٔ مخزن به `memlib/` رفت و داخل wheel هم می‌رود؛ `mem protocol` آن را چاپ
+- `PROTOCOL.md` از ریشهٔ مخزن به `memgrove/` رفت و داخل wheel هم می‌رود؛ `memgrove protocol` آن را چاپ
   می‌کند تا کاربری که از PyPI نصب می‌کند هم راهنمای اتصال دستی را داشته باشد. کد خودش فایل را
   در انبار نمی‌سازد؛ خروجی را shell می‌نویسد (design §۱۱).
 - `.github/workflows/ci.yml`: تست روی لینوکس و ویندوز با پایتون ۳٫۱۱ تا ۳٫۱۴، به‌علاوهٔ ساختن
   wheel و sdist و نصب و اجرای هر دو در محیط تمیز.
-- `.github/workflows/release.yml`: با push تگ `v<نسخه>` — تست، تطبیق تگ با `memlib.__version__`،
+- `.github/workflows/release.yml`: با push تگ `v<نسخه>` — تست، تطبیق تگ با `memgrove.__version__`،
   بیلد، انتشار روی PyPI با Trusted Publishing، و GitHub Release با هر دو artifact. هیچ توکنی
   ذخیره نمی‌شود.
-- README از «clone و `uv tool install .`» به `uv tool install agent-memory` (یا `pipx`) تغییر
+- README از «clone و `uv tool install .`» به `uv tool install memgrove` (یا `pipx`) تغییر
   کرد و نصب از چک‌اوت به بخش توسعه رفت. روش ریلیز در `operations.md` است.
+- نام پروژه از `agent-memory` به `memgrove` رفت: PyPI با چکِ `ultranormalize_name` هر نامی را که
+  به `agentmem0ry` برسد (یعنی `agent-memory`، `agent_memory`، `agent.memory`، `agent-mem`، و
+  خودِ `agentmemory` که پروژه‌ای موجود است) «too similar» رد می‌کند. با این تغییر، نام پکیج،
+  ماژول (`memgrove/`)، دستور (`memgrove`)، نام سرور MCP و سه ابزار آن (`memgrove_index`،
+  `memgrove_read`، `memgrove_write`) و ورودی‌ها (`MEMGROVE_ROOT`، `MEMGROVE_PROJECT_CWD`) یکی
+  شدند. مسیر انبار (`~/.agents/memory`)، فایل `MEMORY.md`، قالب یادداشت و اسلاگ scope عوض
+  نشدند: آن‌ها قرارداد داده‌اند، نه نام ابزار.
 
 ## آنچه در پایان ماند
 
 | جزء | وضعیت |
 |---|---|
 | انبار markdown + `MEMORY.md` | هست |
-| `mem` CLI | هست (`write`, `read`, `list`, `forget`, `index`, `mcp`, `protocol`, `dream`, `migrate`) |
-| سرور MCP | هست (`memory_index`, `memory_read`, `memory_write`) |
+| `memgrove` CLI | هست (`write`, `read`, `list`, `forget`, `index`, `mcp`, `protocol`, `dream`, `migrate`) |
+| سرور MCP | هست (`memgrove_index`, `memgrove_read`, `memgrove_write`) |
 | توزیع | هست: wheel/sdist روی PyPI و GitHub Release، با تست CI روی لینوکس و ویندوز |
 | تثبیت بعد از هر تغییر | هست، قطعی، idempotent |
 | بازیابی لغوی / انتخاب‌گر | نیست (حذف شد) |
@@ -139,11 +146,11 @@ scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می�
 - [x] اجرای دوبارهٔ تثبیت هیچ تغییری نمی‌دهد.
 - [x] نوشتن هم‌زمان با نسخهٔ کهنه رد می‌شود و محتوای فعلی را برمی‌گرداند.
 - [x] متن حاوی کلید/توکن نوشته نمی‌شود.
-- [x] `memory_index` همهٔ یادداشت‌ها را نشان می‌دهد (بدون برش).
-- [x] یک یادداشت که از راه همان `mem mcp` نوشته شد (همان کاری که DSH می‌کند)، از Claude Code
+- [x] `memgrove_index` همهٔ یادداشت‌ها را نشان می‌دهد (بدون برش).
+- [x] یک یادداشت که از راه همان `memgrove mcp` نوشته شد (همان کاری که DSH می‌کند)، از Claude Code
       و opencode هم خوانده می‌شود — در ۲۰۲۶-۱۰-۲۹ تأیید شد: نوشتن و خواندن روی یک انبار موقت، با
       Claude Code 2.1.301 (`claude -p`) و opencode 2.2.0 (`opencode run`). هر سه کلاینت
-      `mem mcp` را بدون env اجرا می‌کنند، پس انبار پروژه هم یکی است.
+      `memgrove mcp` را بدون env اجرا می‌کنند، پس انبار پروژه هم یکی است.
 - [x] داده با `cat` و `grep` خوانا و قابل مهاجرت است.
 - [x] مهاجرت از Claude Code تکرارپذیر است: اجرای دوم یادداشت یکسان را دوباره نمی‌نویسد
       (`exists`) و محتوای متفاوت را `collision` گزارش می‌کند.

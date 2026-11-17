@@ -6,8 +6,8 @@ The 2026-07-28 revision retired that handshake in favour of per-request _meta
 and answers server/discover instead; that probe is implemented here too, so a
 modern-only client is not locked out. Tools are served identically either way.
 
-The server is the whole agent-facing surface: `memory_index` returns the table
-of contents, `memory_read` loads one note, `memory_write` saves one. There is no
+The server is the whole agent-facing surface: `memgrove_index` returns the table
+of contents, `memgrove_read` loads one note, `memgrove_write` saves one. There is no
 keyword search — the index lists every note, and the agent picks.
 
 Nothing here may write to stdout except JSON-RPC responses. A stray print is
@@ -30,8 +30,8 @@ from typing import Any, TextIO
 
 from . import __version__, config, dream, index, store
 
-SERVER_NAME = "mem"
-SERVER_TITLE = "mem — agent-agnostic markdown memory"
+SERVER_NAME = "memgrove"
+SERVER_TITLE = "memgrove — local-first Markdown memory for coding agents"
 
 # Protocol versions from the MCP specification. The last handshake-based
 # revision is 2025-11-25:
@@ -92,8 +92,8 @@ INSTRUCTIONS = (
     "\n"
     "Session bootstrap: take the index once per conversation — on the first "
     "user turn in this context, before you act on that turn, and whether or not "
-    "you begin by loading a skill or reading files, call memory_index with cwd "
-    "set to the session's working directory, then memory_read the notes that "
+    "you begin by loading a skill or reading files, call memgrove_index with cwd "
+    "set to the session's working directory, then memgrove_read the notes that "
     "apply. A later user message in the same conversation is not a new session "
     "and needs no second call: the result stays usable while it is still in the "
     "context. Call it again only when the index is no longer there at all — "
@@ -122,8 +122,8 @@ INSTRUCTIONS = (
     "anything already visible in the code or the instruction files. One note to "
     "one fact, with a description that says when to read it.\n"
     "\n"
-    "memory_write replaces a note's body and requires if_version: the version "
-    "returned by memory_read, or 'new' for a note that does not exist yet. The "
+    "memgrove_write replaces a note's body and requires if_version: the version "
+    "returned by memgrove_read, or 'new' for a note that does not exist yet. The "
     "name, description and type are optional: an omitted one keeps the value "
     "already on the file. A stale version is refused and returns the current "
     "content and version; merge and retry with that version. A line break in "
@@ -146,7 +146,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
         "type": "string",
         "description": (
             "Flat file name of the memory, e.g. 'pnpm-not-npm.md'. Use the path "
-            "returned by memory_index or memory_write; directories are not allowed."
+            "returned by memgrove_index or memgrove_write; directories are not allowed."
         ),
     }
     # MCP clients launch the server in their own working directory, which is the
@@ -161,7 +161,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
     }
     return [
         {
-            "name": "memory_index",
+            "name": "memgrove_index",
             "description": (
                 "List the notes in the shared store: a one-line entry per memory "
                 "(title, file name, description), grouped by type, for the global "
@@ -170,7 +170,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
                 "by loading a skill or reading files, and again only once the "
                 "index is no longer in context — never on each new user message; "
                 "pass cwd when the server serves several projects. Read an entry "
-                "with memory_read before relying on it."
+                "with memgrove_read before relying on it."
             ),
             "inputSchema": {
                 "type": "object",
@@ -179,7 +179,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
             },
         },
         {
-            "name": "memory_read",
+            "name": "memgrove_read",
             "description": (
                 "Read one memory from the shared store. Returns its content, "
                 "version, modified time, type, description and name. Pass the "
@@ -193,12 +193,12 @@ def _tool_definitions() -> list[dict[str, Any]]:
             },
         },
         {
-            "name": "memory_write",
+            "name": "memgrove_write",
             "description": (
                 "Create or replace one memory document in the shared store. Writes "
                 "the markdown file, consolidates the store and refreshes the index "
                 "in the same call, and returns the new version. if_version is "
-                "required: pass the version from memory_read, or 'new' to create a "
+                "required: pass the version from memgrove_read, or 'new' to create a "
                 "file that must not exist yet. If the file changed since it was "
                 "read, the write is refused and the current content and version are "
                 "returned so you can merge; retry with that version. A line break in "
@@ -221,7 +221,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
                     "if_version": {
                         "type": "string",
                         "description": (
-                            "Version from memory_read, or 'new' to create a file. "
+                            "Version from memgrove_read, or 'new' to create a file. "
                             "Optimistic concurrency: a stale value is refused instead "
                             "of overwriting a newer write."
                         ),
@@ -287,7 +287,7 @@ class ToolFailure(Exception):
 
 def _log(message: str) -> None:
     try:
-        sys.stderr.write(f"mem mcp: {message}\n")
+        sys.stderr.write(f"memgrove mcp: {message}\n")
         sys.stderr.flush()
     except Exception:
         # Logging must never take the server down.
@@ -395,7 +395,7 @@ def _project_cwd(arguments: dict[str, Any]) -> str:
     explicit = _optional_str(arguments, "cwd")
     if explicit is not None and explicit.strip():
         return os.path.abspath(os.path.expanduser(explicit))
-    return os.environ.get("MEMORY_PROJECT_CWD") or os.getcwd()
+    return os.environ.get("MEMGROVE_PROJECT_CWD") or os.getcwd()
 
 
 def _store_dir(store_name: str, cwd: str) -> Path:
@@ -489,9 +489,9 @@ def _tool_write(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 _HANDLERS = {
-    "memory_index": _tool_index,
-    "memory_read": _tool_read,
-    "memory_write": _tool_write,
+    "memgrove_index": _tool_index,
+    "memgrove_read": _tool_read,
+    "memgrove_write": _tool_write,
 }
 
 

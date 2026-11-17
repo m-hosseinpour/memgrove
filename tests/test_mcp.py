@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from memlib import config, mcp, store
+from memgrove import config, mcp, store
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,15 +22,15 @@ class McpTestCase(unittest.TestCase):
     """Scratch store per test; every serve() response must be protocol JSON."""
 
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="mem-mcp-")
+        self.tmp = tempfile.mkdtemp(prefix="memgrove-mcp-")
         self.root = Path(self.tmp) / "memory"
         self.project = Path(self.tmp) / "project"
         self.project.mkdir()
         self._saved = {
-            name: os.environ.get(name) for name in ("MEM_ROOT", "MEMORY_PROJECT_CWD")
+            name: os.environ.get(name) for name in ("MEMGROVE_ROOT", "MEMGROVE_PROJECT_CWD")
         }
-        os.environ["MEM_ROOT"] = str(self.root)
-        os.environ["MEMORY_PROJECT_CWD"] = str(self.project)
+        os.environ["MEMGROVE_ROOT"] = str(self.root)
+        os.environ["MEMGROVE_PROJECT_CWD"] = str(self.project)
 
     def tearDown(self):
         for name, value in self._saved.items():
@@ -109,9 +109,9 @@ class InitializeTests(McpTestCase):
         result = init["result"]
         self.assertEqual(result["protocolVersion"], "2025-06-18")
         self.assertIn("tools", result["capabilities"])
-        self.assertEqual(result["serverInfo"]["name"], "mem")
+        self.assertEqual(result["serverInfo"]["name"], "memgrove")
         self.assertTrue(result["serverInfo"]["version"])
-        self.assertIn("memory_write", result["instructions"])
+        self.assertIn("memgrove_write", result["instructions"])
         # Every result names its type for the 2026-07-28 clients; ping has no
         # other fields.
         self.assertEqual(responses[1]["result"], {"resultType": "complete"})
@@ -150,7 +150,7 @@ class ToolsListTests(McpTestCase):
         _, responses, _ = self.serve([self.request("tools/list")])
         tools = {tool["name"]: tool for tool in responses[0]["result"]["tools"]}
         self.assertEqual(
-            sorted(tools), ["memory_index", "memory_read", "memory_write"]
+            sorted(tools), ["memgrove_index", "memgrove_read", "memgrove_write"]
         )
         for tool in tools.values():
             schema = tool["inputSchema"]
@@ -161,14 +161,14 @@ class ToolsListTests(McpTestCase):
             self.assertIn("cwd", schema["properties"])
             self.assertNotIn("cwd", schema.get("required", []))
 
-        index_tool = tools["memory_index"]["inputSchema"]
+        index_tool = tools["memgrove_index"]["inputSchema"]
         self.assertEqual(set(index_tool["properties"]), {"cwd"})
 
-        read = tools["memory_read"]["inputSchema"]
+        read = tools["memgrove_read"]["inputSchema"]
         self.assertEqual(read["required"], ["store", "path"])
         self.assertEqual(set(read["properties"]), {"store", "path", "cwd"})
 
-        write = tools["memory_write"]["inputSchema"]
+        write = tools["memgrove_write"]["inputSchema"]
         self.assertEqual(
             set(write["required"]), {"store", "path", "content", "if_version"}
         )
@@ -183,8 +183,8 @@ class ToolsListTests(McpTestCase):
         init = self.serve(
             [self.request("initialize", {"protocolVersion": "2025-06-18"})]
         )[1][0]["result"]
-        self.assertIn("memory_index", init["instructions"])
-        self.assertIn("memory_write", init["instructions"])
+        self.assertIn("memgrove_index", init["instructions"])
+        self.assertIn("memgrove_write", init["instructions"])
         self.assertNotIn("PROTOCOL", init["instructions"])
         # Claude Code has one memory per project; the split is Qoder's, and an
         # agent that is never told where a note goes picks the wrong store.
@@ -213,14 +213,14 @@ class ToolsListTests(McpTestCase):
         self.assertIn("is not a new session", init["instructions"])
         self.assertIn(
             "never on each new user message",
-            tools["memory_index"]["description"],
+            tools["memgrove_index"]["description"],
         )
         # A client that drops the instructions still sends the tool schemas.
-        self.assertIn("first user turn", tools["memory_index"]["description"])
+        self.assertIn("first user turn", tools["memgrove_index"]["description"])
         # The fallback surface needs the arbitration clause too: a client that
         # drops the instructions is exactly the one whose own skill gate can
         # swallow the first call.
-        self.assertIn("loading a skill", tools["memory_index"]["description"])
+        self.assertIn("loading a skill", tools["memgrove_index"]["description"])
 
     def test_the_param_table_matches_the_schemas(self):
         """_TOOL_PARAMS decides what an unknown argument is, so it must not
@@ -259,7 +259,7 @@ class UnknownArgumentTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_arguments(cwdd=elsewhere),
                     request_id=1,
                 ),
@@ -269,7 +269,7 @@ class UnknownArgumentTests(McpTestCase):
         error = responses[0]["error"]
         self.assertEqual(error["code"], mcp.INVALID_PARAMS)
         self.assertIn("cwdd", error["message"])
-        self.assertIn("memory_write", error["message"])
+        self.assertIn("memgrove_write", error["message"])
         self.assertFalse(self.project_dir().exists())
         # The server keeps serving after a rejected call.
         self.assertEqual(responses[1]["result"], {"resultType": "complete"})
@@ -278,7 +278,7 @@ class UnknownArgumentTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "project", "pth": "typo.md"},
                     request_id=1,
                 )
@@ -290,9 +290,9 @@ class UnknownArgumentTests(McpTestCase):
 
     def test_each_tool_rejects_an_argument_it_does_not_take(self):
         for name, arguments, bad in (
-            ("memory_index", {"cwdd": self.tmp}, "cwdd"),
-            ("memory_read", {"store": "project", "path": "x.md", "extra": 1}, "extra"),
-            ("memory_write", self.write_arguments(nope=True), "nope"),
+            ("memgrove_index", {"cwdd": self.tmp}, "cwdd"),
+            ("memgrove_read", {"store": "project", "path": "x.md", "extra": 1}, "extra"),
+            ("memgrove_write", self.write_arguments(nope=True), "nope"),
         ):
             _, responses, _ = self.serve([self.call(name, arguments, request_id=1)])
             self.assertEqual(
@@ -307,7 +307,7 @@ class UnknownArgumentTests(McpTestCase):
         self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_arguments(cwd=str(self.project)),
                     request_id=1,
                 )
@@ -315,9 +315,9 @@ class UnknownArgumentTests(McpTestCase):
         )
         _, responses, _ = self.serve(
             [
-                self.call("memory_index", {"cwd": str(self.project)}, request_id=1),
+                self.call("memgrove_index", {"cwd": str(self.project)}, request_id=1),
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "project", "path": "typo.md", "cwd": str(self.project)},
                     request_id=2,
                 ),
@@ -344,9 +344,9 @@ class ReadWriteTests(McpTestCase):
     def test_write_then_read_round_trip(self):
         _, responses, _ = self.serve(
             [
-                self.call("memory_write", self.write_new(), request_id=1),
+                self.call("memgrove_write", self.write_new(), request_id=1),
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "project", "path": "pnpm-not-npm.md"},
                     request_id=2,
                 ),
@@ -380,7 +380,7 @@ class ReadWriteTests(McpTestCase):
 
     def test_write_refreshes_the_index_line(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         arguments = self.write_new(
@@ -389,7 +389,7 @@ class ReadWriteTests(McpTestCase):
             description="second description",
         )
         _, responses, _ = self.serve(
-            [self.call("memory_write", arguments, request_id=2)]
+            [self.call("memgrove_write", arguments, request_id=2)]
         )
         self.payload(responses[0])
         index_text = (self.project_dir() / "MEMORY.md").read_text(encoding="utf-8")
@@ -401,7 +401,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(path="u.md", name="prefers-vim", type="user"),
                     request_id=1,
                 )
@@ -411,7 +411,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     {
                         "store": "project",
                         "path": "u.md",
@@ -438,13 +438,13 @@ class ReadWriteTests(McpTestCase):
 
     def test_explicit_arguments_still_change_the_note(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(
                         content="Updated body.",
                         if_version=first["version"],
@@ -465,13 +465,13 @@ class ReadWriteTests(McpTestCase):
 
     def test_bad_type_is_invalid_params_even_on_a_rewrite(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(
                         content="x", if_version=first["version"], type="gotcha"
                     ),
@@ -485,7 +485,7 @@ class ReadWriteTests(McpTestCase):
 
     def test_conflict_carries_current_content_and_version(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         second_arguments = self.write_new(
@@ -493,10 +493,10 @@ class ReadWriteTests(McpTestCase):
         )
         _, responses, _ = self.serve(
             [
-                self.call("memory_write", second_arguments, request_id=2),
+                self.call("memgrove_write", second_arguments, request_id=2),
                 # Stale write: carries the now-outdated first version.
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(if_version=first["version"]),
                     request_id=3,
                 ),
@@ -520,13 +520,13 @@ class ReadWriteTests(McpTestCase):
 
     def test_conflict_payload_tolerates_non_utf8_bytes(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         document = self.project_dir() / "pnpm-not-npm.md"
         document.write_bytes(document.read_bytes() + b"\xff\n")
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(if_version=first["version"]), request_id=2)]
+            [self.call("memgrove_write", self.write_new(if_version=first["version"]), request_id=2)]
         )
         conflict = self.error_payload(responses[0])
         self.assertEqual(conflict["error"], "conflict")
@@ -534,11 +534,11 @@ class ReadWriteTests(McpTestCase):
 
     def test_new_on_existing_file_conflicts(self):
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=1)]
+            [self.call("memgrove_write", self.write_new(), request_id=1)]
         )
         first = self.payload(responses[0])
         _, responses, _ = self.serve(
-            [self.call("memory_write", self.write_new(), request_id=2)]
+            [self.call("memgrove_write", self.write_new(), request_id=2)]
         )
         conflict = self.error_payload(responses[0])
         self.assertEqual(conflict["error"], "conflict")
@@ -549,7 +549,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(content=secret),
                     request_id=1,
                 )
@@ -564,7 +564,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(description="one\ntwo"),
                     request_id=1,
                 )
@@ -579,7 +579,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(content="   \n"),
                     request_id=1,
                 ),
@@ -598,7 +598,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "project", "path": "nope.md"},
                     request_id=1,
                 ),
@@ -617,7 +617,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write_new(
                         store="global",
                         path="prefers-vim.md",
@@ -627,7 +627,7 @@ class ReadWriteTests(McpTestCase):
                     request_id=1,
                 ),
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "global", "path": "prefers-vim.md"},
                     request_id=2,
                 ),
@@ -643,7 +643,7 @@ class ReadWriteTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "workspace", "path": "x.md"},
                     request_id=1,
                 )
@@ -659,7 +659,7 @@ class ReadWriteTests(McpTestCase):
             _, responses, _ = self.serve(
                 [
                     self.call(
-                        "memory_read",
+                        "memgrove_read",
                         {"store": "project", "path": path},
                         request_id=1,
                     )
@@ -675,7 +675,7 @@ class ReadWriteTests(McpTestCase):
         arguments = self.write_new()
         del arguments["if_version"]
         _, responses, _ = self.serve(
-            [self.call("memory_write", arguments, request_id=1)]
+            [self.call("memgrove_write", arguments, request_id=1)]
         )
         error = responses[0]["error"]
         self.assertEqual(error["code"], mcp.INVALID_PARAMS)
@@ -746,9 +746,9 @@ class ProtocolTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call("memory_forget", {}, request_id=1),
-                self.call("memory_write", {"store": "project", "path": "x.md"}, request_id=2),
+                self.call("memgrove_write", {"store": "project", "path": "x.md"}, request_id=2),
                 self.call(
-                    "memory_read",
+                    "memgrove_read",
                     {"store": "project", "path": 7},
                     request_id=3,
                 ),
@@ -782,12 +782,12 @@ class ProtocolTests(McpTestCase):
         code, responses, stderr = self.serve(raw="".join(json.dumps(m) + "\n" for m in messages) + "garbage\n")
         self.assertEqual(code, 0)
         self.assertEqual([response["id"] for response in responses], [1, 2, 3, None])
-        self.assertNotIn("mem mcp:", "".join(json.dumps(r) for r in responses))
-        self.assertIn("mem mcp:", stderr)
+        self.assertNotIn("memgrove mcp:", "".join(json.dumps(r) for r in responses))
+        self.assertIn("memgrove mcp:", stderr)
 
 
 class IndexToolTests(McpTestCase):
-    """memory_index is the whole retrieval path: it lists every note."""
+    """memgrove_index is the whole retrieval path: it lists every note."""
 
     def write(self, path, name, description, store="project", body="body", **extra):
         arguments = {
@@ -805,7 +805,7 @@ class IndexToolTests(McpTestCase):
         self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write(
                         "pnpm-not-npm.md",
                         "pnpm-not-npm",
@@ -815,7 +815,7 @@ class IndexToolTests(McpTestCase):
                     request_id=1,
                 ),
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write(
                         "kde-fontconfig.md",
                         "kde-fontconfig",
@@ -825,7 +825,7 @@ class IndexToolTests(McpTestCase):
                     request_id=2,
                 ),
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write(
                         "prefers-vim.md",
                         "prefers-vim",
@@ -840,7 +840,7 @@ class IndexToolTests(McpTestCase):
 
     def test_index_lists_both_stores(self):
         self.seed()
-        _, responses, _ = self.serve([self.call("memory_index", {}, request_id=1)])
+        _, responses, _ = self.serve([self.call("memgrove_index", {}, request_id=1)])
         result = self.payload(responses[0])
         self.assertEqual(result["count"], 3)
         self.assertIn("# global memory", result["index"])
@@ -850,7 +850,7 @@ class IndexToolTests(McpTestCase):
         self.assertIn("the lockfile is pnpm", result["index"])
 
     def test_index_on_an_empty_store(self):
-        _, responses, _ = self.serve([self.call("memory_index", {}, request_id=1)])
+        _, responses, _ = self.serve([self.call("memgrove_index", {}, request_id=1)])
         result = self.payload(responses[0])
         self.assertEqual(result["count"], 0)
         self.assertEqual(result["index"], "")
@@ -860,7 +860,7 @@ class IndexToolTests(McpTestCase):
         other = Path(self.tmp) / "other"
         other.mkdir()
         _, responses, _ = self.serve(
-            [self.call("memory_index", {"cwd": str(other)}, request_id=1)]
+            [self.call("memgrove_index", {"cwd": str(other)}, request_id=1)]
         )
         result = self.payload(responses[0])
         # The project scope moved; the global scope did not.
@@ -874,20 +874,20 @@ class IndexToolTests(McpTestCase):
             "elsewhere.md", "elsewhere", "a note for another project", cwd=str(other)
         )
         _, responses, _ = self.serve(
-            [self.call("memory_write", arguments, request_id=1)]
+            [self.call("memgrove_write", arguments, request_id=1)]
         )
         written = self.payload(responses[0])
         self.assertEqual(
             Path(written["file"]).parent, config.scope_dir("project", str(other))
         )
-        # MEMORY_PROJECT_CWD is only the fallback: the explicit cwd wins.
+        # MEMGROVE_PROJECT_CWD is only the fallback: the explicit cwd wins.
         self.assertFalse((self.project_dir() / "elsewhere.md").exists())
 
     def test_write_consolidates_the_scope(self):
         self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write("a.md", "shared", "same note"),
                     request_id=1,
                 )
@@ -896,7 +896,7 @@ class IndexToolTests(McpTestCase):
         _, responses, _ = self.serve(
             [
                 self.call(
-                    "memory_write",
+                    "memgrove_write",
                     self.write("b.md", "shared", "same note"),
                     request_id=1,
                 )
@@ -932,7 +932,7 @@ class DiscoveryTests(McpTestCase):
                     "jsonrpc": "2.0",
                     "id": 3,
                     "method": "tools/call",
-                    "params": {"name": "memory_index", "arguments": {}},
+                    "params": {"name": "memgrove_index", "arguments": {}},
                 },
             ]
         )
@@ -940,7 +940,7 @@ class DiscoveryTests(McpTestCase):
         self.assertEqual([r["id"] for r in responses], [1, 2, 3])
         self.assertEqual(
             {tool["name"] for tool in responses[1]["result"]["tools"]},
-            {"memory_index", "memory_read", "memory_write"},
+            {"memgrove_index", "memgrove_read", "memgrove_write"},
         )
         self.assertFalse(responses[2]["result"]["isError"])
 
@@ -989,7 +989,7 @@ class SubprocessTests(McpTestCase):
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             self.request("tools/list", request_id=2),
             self.call(
-                "memory_write",
+                "memgrove_write",
                 {
                     "store": "project",
                     "path": "from-subprocess.md",
@@ -1001,19 +1001,19 @@ class SubprocessTests(McpTestCase):
                 request_id=3,
             ),
             self.call(
-                "memory_read",
+                "memgrove_read",
                 {"store": "project", "path": "from-subprocess.md"},
                 request_id=4,
             ),
         ]
         env = os.environ.copy()
-        env["MEM_ROOT"] = str(self.root)
-        env["MEMORY_PROJECT_CWD"] = str(self.project)
+        env["MEMGROVE_ROOT"] = str(self.root)
+        env["MEMGROVE_PROJECT_CWD"] = str(self.project)
         env["PYTHONPATH"] = os.pathsep.join(
             [str(REPO_ROOT), env.get("PYTHONPATH", "")]
         ).rstrip(os.pathsep)
         process = subprocess.run(
-            [sys.executable, "-m", "memlib", "mcp"],
+            [sys.executable, "-m", "memgrove", "mcp"],
             input="".join(json.dumps(message) + "\n" for message in messages),
             text=True,
             capture_output=True,
@@ -1022,7 +1022,7 @@ class SubprocessTests(McpTestCase):
             timeout=60,
         )
         self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("mem mcp:", process.stderr)
+        self.assertIn("memgrove mcp:", process.stderr)
 
         lines = process.stdout.splitlines()
         self.assertEqual(len(lines), 4)
@@ -1041,18 +1041,18 @@ class SubprocessTests(McpTestCase):
         self.assertTrue((self.project_dir() / "from-subprocess.md").is_file())
         self.assertTrue((self.project_dir() / "MEMORY.md").is_file())
 
-    @unittest.skipUnless(os.name != "nt", "bin/mem is the POSIX development launcher")
+    @unittest.skipUnless(os.name != "nt", "bin/memgrove is the POSIX development launcher")
     def test_bin_mem_launcher_prints_the_version(self):
         # The module above is the cross-platform path; this keeps the no-install
         # launcher from rotting on the platforms that have bash.
         process = subprocess.run(
-            ["bash", str(REPO_ROOT / "bin" / "mem"), "--version"],
+            ["bash", str(REPO_ROOT / "bin" / "memgrove"), "--version"],
             text=True,
             capture_output=True,
             timeout=60,
         )
         self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertRegex(process.stdout.strip(), r"^mem \d+\.\d+\.\d+$")
+        self.assertRegex(process.stdout.strip(), r"^memgrove \d+\.\d+\.\d+$")
 
 
 if __name__ == "__main__":

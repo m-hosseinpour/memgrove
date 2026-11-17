@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from memlib import index, store
+from memgrove import index, store
 
 
 class FrontmatterTests(unittest.TestCase):

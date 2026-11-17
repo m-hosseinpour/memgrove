@@ -6,26 +6,26 @@
 
 ## انبار
 
-- ریشه: `~/.agents/memory` (پیش‌فرض `DEFAULT_ROOT`)، قابل تغییر با `MEM_ROOT` یا `--root`.
+- ریشه: `~/.agents/memory` (پیش‌فرض `DEFAULT_ROOT`)، قابل تغییر با `MEMGROVE_ROOT` یا `--root`.
 - دو scope: `global/` برای یادداشت‌های همه‌جا، و `projects/<slug>/` برای هر دایرکتوری کاری.
   اسلاگ از مسیر مطلق ساخته می‌شود و هر نویسهٔ بیرون از `A-Za-z0-9._-` به `-` تبدیل می‌شود
   (پس `.` و `_` می‌مانند)؛ در ویندوز مسیر پیش از ساخت با `normcase` یکسان می‌شود
   (`C:/Users/u/proj` → `c--users-u-proj`).
 - در هر scope یک `MEMORY.md` هست که **تولیدشده** است: هر نوشتن، حذف و `dream` آن را از روی
-  فایل‌ها از نو می‌سازد. `mem index` نسخهٔ زندهٔ هر دو scope را چاپ می‌کند. ویرایش دستی
+  فایل‌ها از نو می‌سازد. `memgrove index` نسخهٔ زندهٔ هر دو scope را چاپ می‌کند. ویرایش دستی
   `MEMORY.md` ماندگار نیست.
 - فایل هر یادداشت: frontmatter با `name`، `description` و
   `metadata.{node_type,type,modified}`، سپس بدنه. یک یادداشت در هر فایل،
-  نام فایل تخت و با پسوند `.md`؛ `MEMORY.md` (در هر بزرگی‌حروفی) نام مجاز نیست و `mem read`
-  هم آن را نمی‌خواند (`mem index` جای آن است).
+  نام فایل تخت و با پسوند `.md`؛ `MEMORY.md` (در هر بزرگی‌حروفی) نام مجاز نیست و `memgrove read`
+  هم آن را نمی‌خواند (`memgrove index` جای آن است).
 
 ## مهاجرت از Claude Code
 
 ```bash
-./bin/mem migrate --dry-run                 # پیش‌نمایش، بدون نوشتن
-./bin/mem migrate                           # همهٔ پروژه‌ها، هرکدام در scope خودش
-./bin/mem migrate --global user,feedback    # انتقال نوع‌های عمومی به global/
-./bin/mem migrate --cwd "$PWD" --from /path/to/memory   # autoMemoryDirectory سفارشی
+./bin/memgrove migrate --dry-run                 # پیش‌نمایش، بدون نوشتن
+./bin/memgrove migrate                           # همهٔ پروژه‌ها، هرکدام در scope خودش
+./bin/memgrove migrate --global user,feedback    # انتقال نوع‌های عمومی به global/
+./bin/memgrove migrate --cwd "$PWD" --from /path/to/memory   # autoMemoryDirectory سفارشی
 ```
 
 منبع پیش‌فرض `${CLAUDE_CONFIG_DIR:-~/.claude}/projects` است. `MEMORY.md` منبع کپی نمی‌شود
@@ -40,13 +40,13 @@
 
 | ورودی | اثر |
 |---|---|
-| `MEM_ROOT` | ریشهٔ انبار؛ برای تست یا انبار جایگزین. |
-| `--root` | همان، فقط برای همان فرمان CLI (روی `MEM_ROOT` می‌نشیند). |
-| `MEMORY_PROJECT_CWD` | فقط MCP: اگر درخواست `cwd` نداشته باشد، scope پروژه از این مسیر ساخته می‌شود. |
-| `cwd` در درخواست MCP | بر `MEMORY_PROJECT_CWD` اولویت دارد. |
+| `MEMGROVE_ROOT` | ریشهٔ انبار؛ برای تست یا انبار جایگزین. |
+| `--root` | همان، فقط برای همان فرمان CLI (روی `MEMGROVE_ROOT` می‌نشیند). |
+| `MEMGROVE_PROJECT_CWD` | فقط MCP: اگر درخواست `cwd` نداشته باشد، scope پروژه از این مسیر ساخته می‌شود. |
+| `cwd` در درخواست MCP | بر `MEMGROVE_PROJECT_CWD` اولویت دارد. |
 | `cwd`/`--cwd` در CLI | دایرکتوری پروژه برای همان فرمان؛ پیش‌فرض: دایرکتوری جاری. |
 
-در MCP ترتیب این است: `cwd` صریح ← `MEMORY_PROJECT_CWD` ← دایرکتوری جاری سرور.
+در MCP ترتیب این است: `cwd` صریح ← `MEMGROVE_PROJECT_CWD` ← دایرکتوری جاری سرور.
 
 **هشدار:** سروری که برای چند پروژه یک‌جا اجرا می‌شود (مثل DSH) یک دایرکتوری جاری بی‌معنا
 دارد. درخواست‌ها باید `cwd` صریح بفرستند، وگرنه یادداشت در scope پروژهٔ اشتباه می‌نشیند.
@@ -56,19 +56,19 @@
 کاربر عادی از PyPI نصب می‌کند؛ نه clone و نه ساختن:
 
 ```bash
-uv tool install agent-memory        # یا: pipx install agent-memory
-mem --version
-uv tool upgrade agent-memory        # به‌روزرسانی
+uv tool install memgrove        # یا: pipx install memgrove
+memgrove --version
+uv tool upgrade memgrove        # به‌روزرسانی
 ```
 
 روی این ماشین، برای کار روی خودِ کد، نصب از چک‌اوت است:
 
 ```bash
-uv tool install .        # mem روی PATH
-./bin/mem write ...      # همان کد، از داخل چک‌اوت، بدون نصب
+uv tool install .        # memgrove روی PATH
+./bin/memgrove write ...      # همان کد، از داخل چک‌اوت، بدون نصب
 ```
 
-ایجنت‌ها `mem` روی `PATH` را صدا می‌زنند، نه فایل داخل چک‌اوت. بعد از هر تغییر در کد:
+ایجنت‌ها `memgrove` روی `PATH` را صدا می‌زنند، نه فایل داخل چک‌اوت. بعد از هر تغییر در کد:
 
 ```bash
 uv tool install --reinstall .
@@ -79,7 +79,7 @@ uv tool install --reinstall .
 
 ## انتشار
 
-نسخه یک‌جا زندگی می‌کند: `__version__` در `memlib/__init__.py`. تگ `v<همان نسخه>` است و
+نسخه یک‌جا زندگی می‌کند: `__version__` در `memgrove/__init__.py`. تگ `v<همان نسخه>` است و
 workflow انتشار ([`release.yml`](../.github/workflows/release.yml)) با push همان تگ روی گیت‌هاب
 اجرا می‌شود:
 
@@ -93,8 +93,8 @@ git push origin main && git push origin vX.Y.Z
 ترتیب کارها در workflow:
 
 1. تست‌ها روی لینوکس و ویندوز (همان `ci.yml`، به‌صورت reusable).
-2. بررسی این‌که تگ با `memlib.__version__` یکی است؛ نبودِ تطابق job را متوقف می‌کند.
-3. `uv build`، نصب wheel در یک محیط تمیز، و اجرای `mem --version` و `mem protocol`.
+2. بررسی این‌که تگ با `memgrove.__version__` یکی است؛ نبودِ تطابق job را متوقف می‌کند.
+3. `uv build`، نصب wheel در یک محیط تمیز، و اجرای `memgrove --version` و `memgrove protocol`.
 4. انتشار روی PyPI با Trusted Publishing: بدون توکن ذخیره‌شده، با OIDC و environment `pypi`.
 5. ساخت GitHub Release با wheel و sdist پیوست (`--generate-notes`).
 
@@ -103,16 +103,22 @@ git push origin main && git push origin vX.Y.Z
 
 | فیلد | مقدار |
 |---|---|
-| PyPI Project Name | `agent-memory` |
+| PyPI Project Name | `memgrove` |
 | Owner | `m-hosseinpour` |
-| Repository name | `agent-memory` |
+| Repository name | `memgrove` |
 | Workflow name | `release.yml` |
 | Environment name | `pypi` |
 
-نام `agent-memory` تا ۲۰۲۶-۱۱-۱۷ روی PyPI آزاد بود (`/pypi/agent-memory/json` → 404)؛ همان
+نام `memgrove` تا ۲۰۲۶-۱۱-۱۷ روی PyPI آزاد بود (`/pypi/memgrove/json` → 404)؛ همان
 pending publisher نام را رزرو می‌کند و بعد از اولین انتشار به trusted publisher عادی تبدیل
 می‌شود. اگر روزی workflow یا environment تغییر کرد، همین رکورد را به‌روز کنید، نه اینکه توکن
 دستی بسازید.
+
+نام قبلی `agent-memory` را PyPI رد می‌کند: چکِ «too similar» اسم را با تابع `ultranormalize_name`
+مقایسه می‌کند که `-`/`_`/`.` را حذف و `l|i` را `1` و `o` را `0` می‌کند، پس `agent-memory` و
+`agentmemory` (پروژه‌ای موجود روی PyPI) هر دو به `agentmem0ry` می‌رسند. با همین قاعده
+`agent_memory`، `agent.memory` و `agent-mem` هم مسدودند؛ تغییر نام به `memgrove` برای عبور از
+همین چک بود، نه سلیقه.
 
 نکته‌ها:
 
@@ -130,10 +136,10 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 
 ## ویندوز
 
-- نصب از PyPI همان `uv tool install agent-memory` است و `mem.exe` روی `PATH` می‌آید؛
-  `uv tool install .` فقط برای نصب از چک‌اوت است. `python -m memlib` هم همان
-  CLI است. `bin/mem` مخصوص bash است و `bin\mem.cmd` معادل ویندوزیِ بدون نصب.
-- قفل scope در ویندوز روی یک بایت از `<scope>/.mem.lock` است، چون ویندوز هندل پوشه را قفل
+- نصب از PyPI همان `uv tool install memgrove` است و `memgrove.exe` روی `PATH` می‌آید؛
+  `uv tool install .` فقط برای نصب از چک‌اوت است. `python -m memgrove` هم همان
+  CLI است. `bin/memgrove` مخصوص bash است و `bin\memgrove.cmd` معادل ویندوزیِ بدون نصب.
+- قفل scope در ویندوز روی یک بایت از `<scope>/.memgrove.lock` است، چون ویندوز هندل پوشه را قفل
   نمی‌کند. فایل state نیست: با مرگ پروسه آزاد می‌شود و `MEMORY.md` آن را نمی‌بیند.
 - نوشتن همیشه LF است و خواندن CRLF و CR را هم می‌فهمد؛ `memory.md` در هر بزرگی‌حروفی همان
   `MEMORY.md` حساب می‌شود.
@@ -145,23 +151,23 @@ pending publisher نام را رزرو می‌کند و بعد از اولین �
 
 | ایجنت | محل | نکته |
 |---|---|---|
-| Claude Code | `~/.claude.json`، سرور `mem` در scope کاربر | علاوه بر آن `autoMemoryEnabled: false` در `~/.claude/settings.json`، تا حافظهٔ بومی Claude با این انبار هم‌زمان ننویسد. |
+| Claude Code | `~/.claude.json`، سرور `memgrove` در scope کاربر | علاوه بر آن `autoMemoryEnabled: false` در `~/.claude/settings.json`، تا حافظهٔ بومی Claude با این انبار هم‌زمان ننویسد. |
 | opencode | `~/.config/opencode/opencode.json` | زیر `mcp.servers`. |
-| DSH | `~/.dsh/cordis.patch.yml` | یک ردیف `@deepseek-ai/dsh-mcp-client` با `serverName: mem`. |
+| DSH | `~/.dsh/cordis.patch.yml` | یک ردیف `@deepseek-ai/dsh-mcp-client` با `serverName: memgrove`. |
 
 قالب دقیق این سه در README آمده است. بررسی:
 
 ```bash
-claude mcp list                 # mem باید connected باشد
+claude mcp list                 # memgrove باید connected باشد
 opencode mcp list               # همان؛ بعد از restart سرویس اول opencode debug config
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
-  | ./bin/mem mcp | python3 -m json.tool | head -40
+  | ./bin/memgrove mcp | python3 -m json.tool | head -40
 ```
 
-هر سه کلاینت `mem mcp` را بدون env اجرا می‌کنند، پس هر سه همان `~/.agents/memory` را می‌بینند.
-خواندن بین دو کلاینت در ۲۰۲۶-۱۰-۲۹ تأیید شد: یادداشتی که از راه `mem mcp` روی یک انبار موقت
-نوشته شد، با `claude -p` (ابزار `mcp__mem__memory_read`) و `opencode run` (ابزار
-`mem_memory_read`) هم خوانده شد.
+هر سه کلاینت `memgrove mcp` را بدون env اجرا می‌کنند، پس هر سه همان `~/.agents/memory` را می‌بینند.
+خواندن بین دو کلاینت در ۲۰۲۶-۱۰-۲۹ تأیید شد (هنوز با نام‌های قدیمی، پیش از تغییر نام به
+`memgrove`): یادداشتی که از راه سرور روی یک انبار موقت نوشته شد، با `claude -p` (ابزار
+`mcp__mem__memory_read`) و `opencode run` (ابزار `mem_memory_read`) هم خوانده شد.
 
 `opencode mcp list` بلافاصله بعد از `opencode service restart` ممکن است «No MCP servers
 configured» بگوید تا وقتی location بارگذاری شود؛ یک `opencode debug config` پیش از آن کافی است.
@@ -169,19 +175,19 @@ configured» بگوید تا وقتی location بارگذاری شود؛ یک `o
 ## بررسی سریع
 
 ```bash
-export MEM_ROOT=$(mktemp -d)
+export MEMGROVE_ROOT=$(mktemp -d)
 export PROJ=$(mktemp -d)
-./bin/mem write --scope project --cwd "$PROJ" --path a.md --name shared \
+./bin/memgrove write --scope project --cwd "$PROJ" --path a.md --name shared \
   --description "a note" --if-version new --content "body"
-./bin/mem write --scope project --cwd "$PROJ" --path b.md --name shared \
+./bin/memgrove write --scope project --cwd "$PROJ" --path b.md --name shared \
   --description "a note" --if-version new --content "body"
-ls "$MEM_ROOT"/projects/*/          # a.md رفته است: تثبیت همان لحظه اجرا شد
-./bin/mem index --cwd "$PROJ"
-./bin/mem read --scope project --cwd "$PROJ" --path b.md
-rm -rf "$MEM_ROOT" "$PROJ"
+ls "$MEMGROVE_ROOT"/projects/*/          # a.md رفته است: تثبیت همان لحظه اجرا شد
+./bin/memgrove index --cwd "$PROJ"
+./bin/memgrove read --scope project --cwd "$PROJ" --path b.md
+rm -rf "$MEMGROVE_ROOT" "$PROJ"
 ```
 
-در ویندوز همین بررسی با `mem` (یا `python -m memlib`) و `$env:MEM_ROOT` / `$env:PROJ` انجام
+در ویندوز همین بررسی با `memgrove` (یا `python -m memgrove`) و `$env:MEMGROVE_ROOT` / `$env:PROJ` انجام
 می‌شود.
 
 ## محدودیت‌های شناخته‌شده
@@ -191,17 +197,17 @@ rm -rf "$MEM_ROOT" "$PROJ"
   کوتاه (`... tag blue`) یادداشت را حذف نمی‌کند و بازگویی با واژه‌های دیگر یادداشت جداگانه می‌ماند.
   توصیف با بیش از ۱۹ واژهٔ متمایز هرگز با شباهت ادغام نمی‌شود، پس دو یادداشت تکراری با توصیف
   بلند کنار هم می‌مانند؛ «تغییر نام + تناقض» هم تشخیص داده نمی‌شود.
-- MCP ابزار حذف ندارد؛ حذف از راه CLI (`mem forget`) است.
-- `mem read` فقط نام تخت `.md` می‌پذیرد؛ `..`، مسیر مطلق و `MEMORY.md` (در هر بزرگی‌حروفی)
+- MCP ابزار حذف ندارد؛ حذف از راه CLI (`memgrove forget`) است.
+- `memgrove read` فقط نام تخت `.md` می‌پذیرد؛ `..`، مسیر مطلق و `MEMORY.md` (در هر بزرگی‌حروفی)
   رد می‌شوند. بایت نامعتبر UTF-8 در فایل دست‌نویس با `U+FFFD` جایگزین می‌شود، نه تراک‌بک.
-- `mem index` فقط چاپ می‌کند؛ فایل `MEMORY.md` فقط با نوشتن یا `dream` بازنویسی می‌شود.
+- `memgrove index` فقط چاپ می‌کند؛ فایل `MEMORY.md` فقط با نوشتن یا `dream` بازنویسی می‌شود.
 - بدون تاریخچهٔ git و بدون استیت: حذف اشتباه فقط با بازنویسی دستی جبران می‌شود.
 - انبار فقط روی همین ماشین است و خودش پشتیبان نمی‌گیرد: خرابی دیسک یعنی از دست رفتن حافظه. اگر
   پشتیبان می‌خواهید، بیرون از ابزار از `~/.agents/memory` کپی دوره‌ای بگیرید (تصمیمش در
   design §۱۱).
 - یک سرور MCP برای چند پروژه باید در هر درخواست `cwd` بگیرد (بالا).
 - `PROTOCOL.md` خودکار در ریشهٔ انبار ساخته نمی‌شود؛ کد فقط چاپش می‌کند:
-  `mem protocol > ~/.agents/memory/PROTOCOL.md` (فایل داخل پکیج است، پس نسخهٔ نصب‌شده هم
+  `memgrove protocol > ~/.agents/memory/PROTOCOL.md` (فایل داخل پکیج است، پس نسخهٔ نصب‌شده هم
   همان را دارد).
 - فرانت‌متر فقط سه کلیدِ تحت مدیریت را نگه می‌دارد (`name`، `description`، `metadata`)؛ کلید
   دست‌نویس دیگری مثل `title` در اولین بازنویسی حذف می‌شود. عنوانِ ایندکس از `name` ساخته

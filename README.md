@@ -1,11 +1,12 @@
-# agent-memory
+# memgrove
 
 **Persistent, local-first Markdown memory for AI coding agents.**
 
 Give Claude Code, OpenCode, DeepSeek Harness (DSH), and other
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) clients one shared store for
 useful notes across projects and sessions. Memories are ordinary Markdown files on your
-machine—not a database or opaque binary format—and the `mem` CLI and MCP server use the same store.
+machine—not a database or opaque binary format—and the `memgrove` CLI and MCP server read and
+write the same store.
 
 MCP gives connected agents tools to read and write notes; it does not record every conversation
 automatically. Agents choose what is worth remembering and retrieve notes when relevant.
@@ -16,7 +17,7 @@ automatically. Agents choose what is worth remembering and retrieve notes when r
 - **One memory store, multiple agents:** keep project-specific notes separate from user-wide
   preferences and share both with every connected MCP client.
 - **Readable and portable:** inspect, edit, or back up the Markdown files with ordinary tools.
-- **No per-agent plugin:** connect through MCP, or use the `mem` command directly.
+- **No per-agent plugin:** connect through MCP, or use the `memgrove` command directly.
 - **Safer concurrent edits:** version checks refuse stale writes instead of silently overwriting
   newer notes. A basic secret-pattern guard blocks some common credentials; it is not a full
   secret scanner.
@@ -32,18 +33,18 @@ Requires Python 3.11 or newer and either [uv](https://docs.astral.sh/uv/) or
 [pipx](https://pipx.pypa.io/):
 
 ```bash
-uv tool install agent-memory      # or: pipx install agent-memory
-mem --version
+uv tool install memgrove      # or: pipx install memgrove
+memgrove --version
 ```
 
-One console script, no per-agent plugin. Upgrade with `uv tool upgrade agent-memory` (or
-`pipx upgrade agent-memory`), pin a release with `agent-memory==<version>`, and run the server
-without installing it with `uvx --from agent-memory mem mcp`.
+One console script, no per-agent plugin. Upgrade with `uv tool upgrade memgrove` (or
+`pipx upgrade memgrove`), pin a release with `memgrove==<version>`, and run the server
+without installing it with `uvx --from memgrove memgrove mcp`.
 
 For Claude Code, connect the MCP server with:
 
 ```bash
-claude mcp add mem mem mcp --scope user
+claude mcp add memgrove memgrove mcp --scope user
 ```
 
 For OpenCode, DSH, and other MCP clients, use the configuration examples in [MCP](#mcp).
@@ -52,7 +53,7 @@ For an agent without an MCP client, write the manual connection guide into the s
 
 ```bash
 mkdir -p ~/.agents/memory
-mem protocol > ~/.agents/memory/PROTOCOL.md
+memgrove protocol > ~/.agents/memory/PROTOCOL.md
 ```
 
 The store is created on the first write at `~/.agents/memory`. See
@@ -65,8 +66,8 @@ native memory continues writing separately. More detail is in [`docs/design.md`]
 To work on the code, use a checkout and install that instead:
 
 ```bash
-git clone https://github.com/m-hosseinpour/agent-memory.git
-cd agent-memory
+git clone https://github.com/m-hosseinpour/memgrove.git
+cd memgrove
 uv tool install .
 ```
 
@@ -79,21 +80,21 @@ uv tool install --reinstall .
 The checkout also runs without any install:
 
 ```bash
-python -m memlib --help      # every platform
-./bin/mem --help             # Linux/macOS
+python -m memgrove --help      # every platform
+./bin/memgrove --help             # Linux/macOS
 ```
 
 ```powershell
-bin\mem.cmd --help           # Windows
+bin\memgrove.cmd --help           # Windows
 ```
 
-`MEM_ROOT` points `mem` at a different root (used by the tests).
+`MEMGROVE_ROOT` points `memgrove` at a different root (used by the tests).
 
 ## How it works
 
 **Retrieval *is* the index.** No keyword search, no model call, and nothing injected behind the
-agent's back. `memory_index` returns the whole table of contents, `memory_read` loads one note,
-and `memory_write` saves one — then consolidates the store before it returns, so there is no
+agent's back. `memgrove_index` returns the whole table of contents, `memgrove_read` loads one note,
+and `memgrove_write` saves one — then consolidates the store before it returns, so there is no
 queued state and no background pass.
 
 A rewrite changes only the fields the caller passes: `name`, `description` and `type` keep their
@@ -105,24 +106,24 @@ of the index. A new note defaults to the filename stem, an empty description and
 Register the server once per agent; there is nothing else to install per agent.
 
 ```json
-// Claude Code: ~/.claude.json (user scope), or `claude mcp add mem mem mcp --scope user`
-{ "mcpServers": { "mem": { "command": "mem", "args": ["mcp"] } } }
+// Claude Code: ~/.claude.json (user scope), or `claude mcp add memgrove memgrove mcp --scope user`
+{ "mcpServers": { "memgrove": { "command": "memgrove", "args": ["mcp"] } } }
 ```
 
 ```json
 // opencode: ~/.config/opencode/opencode.json
-{ "mcp": { "servers": { "mem": { "type": "local", "command": ["mem", "mcp"], "enabled": true } } } }
+{ "mcp": { "servers": { "memgrove": { "type": "local", "command": ["memgrove", "mcp"], "enabled": true } } } }
 ```
 
 ```yaml
 # DSH: ~/.dsh/cordis.patch.yml (rewrite the file live, no restart needed)
 - insert:
-    - id: mcp-mem
+    - id: mcp-memgrove
       name: '@deepseek-ai/dsh-mcp-client'
       config:
-        serverName: mem
+        serverName: memgrove
         transport: stdio
-        command: mem
+        command: memgrove
         args: ['mcp']
 ```
 
@@ -130,14 +131,14 @@ Tools:
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `memory_index` | `cwd?` | the table of contents of the global and the project store |
-| `memory_read` | `store`, `path`, `cwd?` | body, version, modified, type, description |
-| `memory_write` | `store`, `path`, `content`, `if_version`, `name?`, `description?`, `type?`, `cwd?` | the new version; consolidates the store first |
+| `memgrove_index` | `cwd?` | the table of contents of the global and the project store |
+| `memgrove_read` | `store`, `path`, `cwd?` | body, version, modified, type, description |
+| `memgrove_write` | `store`, `path`, `content`, `if_version`, `name?`, `description?`, `type?`, `cwd?` | the new version; consolidates the store first |
 
 The server's usage contract — the two scopes, the four types, what not to save, `if_version` —
 travels in the MCP `instructions` field of `initialize` / `server/discover`, which is what that
 field is for. It opens with the session bootstrap: on the first user turn in the context, before
-acting on it — even when the turn begins by loading a skill or reading files — call `memory_index`
+acting on it — even when the turn begins by loading a skill or reading files — call `memgrove_index`
 with `cwd`; **once per conversation**, since a later user message is not a new session, and again
 only after a compaction or a resume that did not carry the index, when it is no longer in context.
 MCP has no channel that pushes the index into a client's context, so this contract is the
@@ -153,21 +154,21 @@ The CLI is the same store by hand. `--scope` defaults to `project` and `--cwd` t
 directory, so a command run inside a project needs neither:
 
 ```bash
-mem write --path pnpm-not-npm.md --name pnpm-not-npm \
+memgrove write --path pnpm-not-npm.md --name pnpm-not-npm \
   --description "the lockfile is pnpm; npm install breaks CI" --if-version new <<'EOF'
 The lockfile is pnpm. `npm install` rewrites it and breaks CI.
 EOF
 
-mem read   --path pnpm-not-npm.md
-mem list
-mem index                     # the table of contents of both scopes
-mem forget --path pnpm-not-npm.md
-mem dream                     # a manual consolidation pass
-mem dream --all               # every project scope
-mem migrate --dry-run         # Claude Code notes: preview, write nothing
-mem mcp                       # the MCP server on stdio
-mem protocol                  # print PROTOCOL.md, the hand-wiring guide
-mem --version
+memgrove read --path pnpm-not-npm.md
+memgrove list
+memgrove index                     # the table of contents of both scopes
+memgrove forget --path pnpm-not-npm.md
+memgrove dream                     # a manual consolidation pass
+memgrove dream --all               # every project scope
+memgrove migrate --dry-run         # Claude Code notes: preview, write nothing
+memgrove mcp                       # the MCP server on stdio
+memgrove protocol                  # print PROTOCOL.md, the hand-wiring guide
+memgrove --version
 ```
 
 Pass `--cwd /path/to/project` to act on another project, and `--scope global` for the global
@@ -182,20 +183,20 @@ different existing note, `0` otherwise.
 
 Claude Code keeps auto memory per project under
 `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/memory/`, in the note format this store reads.
-`mem migrate` copies the notes in, skips the generated `MEMORY.md`, and lets this store rebuild
+`memgrove migrate` copies the notes in, skips the generated `MEMORY.md`, and lets this store rebuild
 the index:
 
 ```bash
-mem migrate --dry-run                  # the plan, no writes
-mem migrate                            # every project, into projects/<slug>
-mem migrate --global user,feedback     # promote those types to global/
-mem migrate --cwd /path/to/project     # one project (e.g. a custom autoMemoryDirectory)
+memgrove migrate --dry-run                  # the plan, no writes
+memgrove migrate                            # every project, into projects/<slug>
+memgrove migrate --global user,feedback     # promote those types to global/
+memgrove migrate --cwd /path/to/project     # one project (e.g. a custom autoMemoryDirectory)
 ```
 
 Claude Code's directory name cannot be decoded back to a path — it turns every non-alphanumeric
 into `-`, so a dot is lost — so the importer reads the real cwd from the project's session logs
 and builds the scope with the store's own slug. A project whose cwd cannot be recovered is
-reported and skipped rather than written where no `mem` command would read it; `--cwd` resolves
+reported and skipped rather than written where no `memgrove` command would read it; `--cwd` resolves
 a project from the cwd you already know.
 
 Notes stay in their own project scope by default: one may say `type: feedback` and still be
@@ -210,8 +211,8 @@ deleted, and a migrated note it removed is reported as `removed`.
 
 ## Consolidation
 
-Every `mem write`/`mem forget` and every `memory_write` consolidates the scope it touched before
-returning. The rules are deterministic — no model call:
+Every `memgrove write`/`memgrove forget` and every `memgrove_write` consolidates the scope it
+touched before returning. The rules are deterministic — no model call:
 
 - two files of the same type with the same `name` are one note; the newer `modified` wins and
   the older file is removed (its body is **not** merged);
@@ -223,8 +224,8 @@ returning. The rules are deterministic — no model call:
 
 A pass deletes a file only while its bytes still match what it read, and writes a merged keeper
 with the version it read, so a concurrent agent either wins cleanly or leaves both files for the
-next pass. The pass is idempotent: running it twice changes nothing. `mem dream` runs it by hand
-(`--all` for every project).
+next pass. The pass is idempotent: running it twice changes nothing. `memgrove dream` runs it by
+hand (`--all` for every project).
 
 A description with more than 19 distinct words is not compared for similarity at all: at that
 size the same 0.95 would begin to accept a qualifier, so two notes that long are left apart rather
@@ -239,8 +240,8 @@ half of a pair gets deleted.
 ## Store layout
 
 ```
-$MEM_ROOT/
-├── PROTOCOL.md                # optional, for hand-wired agents; `mem protocol` prints it
+$MEMGROVE_ROOT/
+├── PROTOCOL.md                # optional, for hand-wired agents; `memgrove protocol` prints it
 ├── global/{MEMORY.md,*.md}    # user-wide preferences and facts
 └── projects/<slug>/{MEMORY.md,*.md}
 ```
@@ -248,26 +249,26 @@ $MEM_ROOT/
 `<slug>` is the absolute cwd with every unsafe character replaced by `-` and `.`/`_` kept:
 `/home/u/proj` becomes `-home-u-proj`. On Windows the path is case-folded first, so
 `C:/Users/u/proj` becomes `c--users-u-proj` and the same project cannot get two scopes from two
-spellings. Each project gets one directory and no path escapes `$MEM_ROOT`.
+spellings. Each project gets one directory and no path escapes `$MEMGROVE_ROOT`.
 
 There is no config file, no runtime state, and no git repository: the store is the notes and the
-index. On Windows each scope also holds a `.mem.lock` file; the OS releases the lock when the
-process exits, the file is invisible to the index, and it can be deleted while `mem` is not
+index. On Windows each scope also holds a `.memgrove.lock` file; the OS releases the lock when the
+process exits, the file is invisible to the index, and it can be deleted while `memgrove` is not
 running.
 
 ## Windows
 
 Everything above works unchanged; the differences are the shell and a few file-system rules.
 
-- Install with `uv tool install agent-memory` (or `pipx install agent-memory`) in PowerShell;
-  `uv tool install .` is the checkout form from [Install](#install). `mem.exe` lands on `PATH`;
-  open a new terminal so the PATH update is visible (`Get-Command mem` confirms it).
-- There is no bash requirement. Use the installed `mem`, `python -m memlib`, or `bin\mem.cmd`
-  as the no-install launcher.
+- Install with `uv tool install memgrove` (or `pipx install memgrove`) in PowerShell;
+  `uv tool install .` is the checkout form from [Install](#install). `memgrove.exe` lands on `PATH`;
+  open a new terminal so the PATH update is visible (`Get-Command memgrove` confirms it).
+- There is no bash requirement. Use the installed `memgrove`, `python -m memgrove`, or
+  `bin\memgrove.cmd` as the no-install launcher.
 - README shell examples use bash heredocs. In PowerShell, pass the body inline or from a file:
 
   ```powershell
-  mem write --path pnpm-not-npm.md --name pnpm-not-npm `
+  memgrove write --path pnpm-not-npm.md --name pnpm-not-npm `
     --description "the lockfile is pnpm; npm install breaks CI" `
     --if-version new --content-file body.md
   ```
@@ -275,9 +276,9 @@ Everything above works unchanged; the differences are the shell and a few file-s
 - Notes written by Notepad or another CRLF editor are read correctly; the store writes LF, so
   one note has the same bytes on every OS. `memory.md` is reserved in any casing, because on a
   case-insensitive volume it *is* the generated `MEMORY.md`.
-- Claude Code's user config is `%USERPROFILE%\.claude.json`; `claude mcp add mem mem mcp --scope
-  user` works in PowerShell as written. opencode and DSH use their own config files under the
-  home directory, with the same JSON/YAML shown above.
+- Claude Code's user config is `%USERPROFILE%\.claude.json`; `claude mcp add memgrove memgrove
+  mcp --scope user` works in PowerShell as written. opencode and DSH use their own config files
+  under the home directory, with the same JSON/YAML shown above.
 - The CLI prints UTF-8 JSON regardless of the console code page. Windows PowerShell 5.1 can
   still garble non-ASCII output when it reads a native command; use PowerShell 7+, or run
   `[Console]::OutputEncoding = [Text.Encoding]::UTF8` once per session. The same applies to
@@ -285,41 +286,41 @@ Everything above works unchanged; the differences are the shell and a few file-s
 
   ```powershell
   New-Item -ItemType Directory -Force -Path $HOME\.agents\memory
-  mem protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md
+  memgrove protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md
   ```
 
 ## Development
 
 ```
-bin/mem              POSIX launcher for development (python3 -m memlib, no install needed)
-bin/mem.cmd          Windows launcher for development
-memlib/store.py      files, frontmatter, version tokens, conflicts, secret refusal, locking
-memlib/index.py      MEMORY.md generation (atomic, no line budget)
-memlib/dream.py      consolidation, called after every change and by `mem dream`
-memlib/mcp.py        MCP stdio server: memory_index / memory_read / memory_write
-memlib/migrate.py    import Claude Code's per-project notes and rebuild the index
-memlib/cli.py        argparse surface
-memlib/PROTOCOL.md   the agent-facing contract; `mem protocol` prints it, the shell saves it
-.github/workflows/   the test suite on Linux and Windows, and the tag-triggered release
-docs/                research.md, design.md, roadmap.md, operations.md
-tests/               unittest (stdlib only)
+bin/memgrove           POSIX launcher for development (python3 -m memgrove, no install needed)
+bin/memgrove.cmd       Windows launcher for development
+memgrove/store.py      files, frontmatter, version tokens, conflicts, secret refusal, locking
+memgrove/index.py      MEMORY.md generation (atomic, no line budget)
+memgrove/dream.py      consolidation, called after every change and by `memgrove dream`
+memgrove/mcp.py        MCP stdio server: memgrove_index / memgrove_read / memgrove_write
+memgrove/migrate.py    import Claude Code's per-project notes and rebuild the index
+memgrove/cli.py        argparse surface
+memgrove/PROTOCOL.md   the agent-facing contract; `memgrove protocol` prints it, the shell saves it
+.github/workflows/     the test suite on Linux and Windows, and the tag-triggered release
+docs/                  research.md, design.md, roadmap.md, operations.md
+tests/                 unittest (stdlib only)
 ```
 
 Tests use the standard library only:
 
 ```bash
-export MEM_ROOT=$(mktemp -d)          # tests refuse to touch the real store
+export MEMGROVE_ROOT=$(mktemp -d)          # tests refuse to touch the real store
 python3 -m unittest discover -s tests -v
 ```
 
 On Windows:
 
 ```powershell
-$env:MEM_ROOT = Join-Path $env:TEMP "mem-test"
+$env:MEMGROVE_ROOT = Join-Path $env:TEMP "memgrove-test"
 python -m unittest discover -s tests -v
 ```
 
-A release is a tag. Bump `__version__` in `memlib/__init__.py`, commit, and push `v<version>`:
+A release is a tag. Bump `__version__` in `memgrove/__init__.py`, commit, and push `v<version>`:
 GitHub Actions runs the suite on Linux and Windows, builds the wheel and the sdist, uploads them
 to PyPI through Trusted Publishing, and creates the GitHub Release with both files attached
 (`.github/workflows/release.yml`). The one-time PyPI setup is in
@@ -355,23 +356,24 @@ README and `PROTOCOL.md` are English; the documents under `docs/` are Persian.
   take an exclusive lock on the scope for the read-check-replace, because a token check without a
   lock is check-then-act: two writers holding the same token would both pass. On POSIX the lock
   is the directory's own inode — no file, no state, gone with the process. Windows cannot lock a
-  directory handle, so there the lock is one byte of a `.mem.lock` file in the scope; it is still
-  kernel state rather than bookkeeping, and the OS drops it when the process dies.
-- **`mem read` takes a flat `.md` name.** `..`, absolute paths and `MEMORY.md` (in any case) are
-  refused; the generated index is `mem index`. A hand-written file with invalid UTF-8 is decoded
-  with replacement characters instead of failing the command.
+  directory handle, so there the lock is one byte of a `.memgrove.lock` file in the scope; it is
+  still kernel state rather than bookkeeping, and the OS drops it when the process dies.
+- **`memgrove read` takes a flat `.md` name.** `..`, absolute paths and `MEMORY.md` (in any case)
+  are refused; the generated index is `memgrove index`. A hand-written file with invalid UTF-8 is
+  decoded with replacement characters instead of failing the command.
 - **The store is local to one machine.** There is no remote, no sync and no backup inside the
   tool: the version token and the short-lived lock only protect writers on the same machine, and
   a shared or network-backed store is not safe to write from two agents. Copy
   `~/.agents/memory` elsewhere on a schedule if you want a backup; the tool will not do it.
 - **`PROTOCOL.md` is not part of the agent's onboarding.** The MCP `instructions` field is. The
   protocol file is only for connecting an agent that has no MCP client; it ships inside the
-  package and `mem protocol` prints it, but the server never exposes it as a tool or a resource.
-- When testing, set `MEM_ROOT` to a scratch directory. The default root is the real store.
+  package and `memgrove protocol` prints it, but the server never exposes it as a tool or a
+  resource.
+- When testing, set `MEMGROVE_ROOT` to a scratch directory. The default root is the real store.
 
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
 
-If agent-memory is useful in your workflow, consider starring the repository to help other
+If memgrove is useful in your workflow, consider starring the repository to help other
 developers looking for shared memory for their coding agents find it.

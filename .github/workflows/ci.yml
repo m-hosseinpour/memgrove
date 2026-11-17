@@ -24,7 +24,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: run the suite
         env:
-          MEM_ROOT: ${{ runner.temp }}/mem-test
+          MEMGROVE_ROOT: ${{ runner.temp }}/memgrove-test
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s tests -v
 
@@ -41,7 +41,7 @@ jobs:
             target="/tmp/check-$(basename "$artifact")"
             uv venv "$target"
             uv pip install --python "$target/bin/python" "$artifact"
-            "$target/bin/mem" --version
-            "$target/bin/mem" protocol > "$target/PROTOCOL.md"
-            cmp "$target/PROTOCOL.md" memlib/PROTOCOL.md
+            "$target/bin/memgrove" --version
+            "$target/bin/memgrove" protocol > "$target/PROTOCOL.md"
+            cmp "$target/PROTOCOL.md" memgrove/PROTOCOL.md
           done
