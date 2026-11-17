@@ -1,17 +1,82 @@
 # agent-memory
 
-One markdown memory store shared by every coding agent on your machine.
+**Persistent, local-first Markdown memory for AI coding agents.**
 
-Notes live as plain markdown on disk — one file per memory, in Claude Code's note format and
-indexed by a `MEMORY.md` table of contents ([`docs/research.md`](docs/research.md) §1) — so the
-data stays readable by hand, by `cat`, and by `grep`.
+Give Claude Code, OpenCode, DeepSeek Harness (DSH), and other
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) clients one shared store for
+useful notes across projects and sessions. Memories are ordinary Markdown files on your
+machine—not a database or opaque binary format—and the `mem` CLI and MCP server use the same store.
+
+MCP gives connected agents tools to read and write notes; it does not record every conversation
+automatically. Agents choose what is worth remembering and retrieve notes when relevant.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 
-The `mem` package holds every rule: the store, the index, consolidation, the MCP server. The CLI
-and the MCP server are two front doors to the same code. Any agent with an MCP client shares the
-same notes, with no per-agent plugin or hook to install and no instruction file to maintain.
+- **One memory store, multiple agents:** keep project-specific notes separate from user-wide
+  preferences and share both with every connected MCP client.
+- **Readable and portable:** inspect, edit, or back up the Markdown files with ordinary tools.
+- **No per-agent plugin:** connect through MCP, or use the `mem` command directly.
+- **Safer concurrent edits:** version checks refuse stale writes instead of silently overwriting
+  newer notes. A basic secret-pattern guard blocks some common credentials; it is not a full
+  secret scanner.
+- **Lightweight and cross-platform:** Python 3.11+, standard library only; Linux, macOS, and
+  Windows.
+
+> **Data note:** Notes are unencrypted local files. The tool does not sync or back them up. When
+> an agent reads a note, that text may be sent to the model provider configured for that agent.
+
+## Install
+
+Requires [uv](https://docs.astral.sh/uv/) (or another Python installer that can create a console
+script) and Python 3.11 or newer.
+
+```bash
+git clone https://github.com/m-hosseinpour/agent-memory.git
+cd agent-memory
+uv tool install .
+```
+
+After pulling an update to this checkout, refresh the installed command:
+
+```bash
+uv tool install --reinstall .
+```
+
+For Claude Code, connect the MCP server with:
+
+```bash
+claude mcp add mem mem mcp --scope user
+```
+
+For OpenCode, DSH, and other MCP clients, use the configuration examples in [MCP](#mcp).
+
+For an agent without an MCP client, copy the manual connection guide into the store:
+
+```bash
+mkdir -p ~/.agents/memory
+cp PROTOCOL.md ~/.agents/memory/
+```
+
+The store is created on the first write at `~/.agents/memory`. See
+[Migrating from Claude Code](#migrating-from-claude-code) to import existing notes.
+
+For Claude Code, also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`; otherwise its
+native memory continues writing separately. More detail is in [`docs/design.md`](docs/design.md)
+§9–§10.
+
+For development, run the checkout directly without installing:
+
+```bash
+python -m memlib --help      # every platform
+./bin/mem --help             # Linux/macOS
+```
+
+```powershell
+bin\mem.cmd --help           # Windows
+```
+
+`MEM_ROOT` points `mem` at a different root (used by the tests).
 
 ## How it works
 
@@ -23,50 +88,6 @@ queued state and no background pass.
 A rewrite changes only the fields the caller passes: `name`, `description` and `type` keep their
 current values when omitted, so fixing a typo in the body cannot move a note to another section
 of the index. A new note defaults to the filename stem, an empty description and `project`.
-
-The store lives at `~/.agents/memory` and is wired into any MCP client by registering the server
-(below). It is installed once with `uv tool install`, so every agent calls the same `mem` on
-`PATH` rather than a path inside this checkout.
-
-Python 3.11+ and the standard library — no dependencies, on Linux, macOS or Windows.
-
-## Install
-
-Requires [uv](https://docs.astral.sh/uv/) (or any Python installer that can create a console
-script) and Python 3.11 or newer.
-
-```bash
-uv tool install .                        # from this checkout: puts `mem` on PATH
-uv tool install --reinstall .            # after changing this checkout
-```
-
-Then register the MCP server in the agents you use — [MCP](#mcp) is the main way the store is
-consumed. The CLI below is the same code by hand.
-
-The store itself is just a directory. The first write creates it; to also place the agent
-protocol next to the notes:
-
-```bash
-mkdir -p ~/.agents/memory
-cp PROTOCOL.md ~/.agents/memory/
-```
-
-`MEM_ROOT` points `mem` at a different root (used by the tests).
-
-For Claude Code, also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`: otherwise
-its native memory keeps writing beside this store and the two drift apart (see
-[`docs/design.md`](docs/design.md) §9–§10).
-
-For development, no install is needed — run the checkout directly:
-
-```bash
-python -m memlib --help      # every platform, from the checkout root
-./bin/mem --help             # Linux/macOS launcher
-```
-
-```powershell
-bin\mem.cmd --help           # Windows launcher
-```
 
 ## MCP
 
@@ -325,3 +346,6 @@ README and `PROTOCOL.md` are English; the documents under `docs/` are Persian.
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
+
+If agent-memory is useful in your workflow, consider starring the repository to help other
+developers looking for shared memory for their coding agents find it.
