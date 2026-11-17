@@ -285,8 +285,8 @@ Everything above works unchanged; the differences are the shell and a few file-s
   saving the guide: PS 5.1's `>` writes UTF-16, so use
 
   ```powershell
-  New-Item -ItemType Directory -Force -Path $HOME\.agents\memory
-  memgrove protocol | Out-File -Encoding utf8 $HOME\.agents\memory\PROTOCOL.md
+  New-Item -ItemType Directory -Force -Path $HOME\.agents\memgrove
+  memgrove protocol | Out-File -Encoding utf8 $HOME\.agents\memgrove\PROTOCOL.md
   ```
 
 ## Development

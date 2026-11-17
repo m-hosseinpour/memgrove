@@ -636,6 +636,32 @@ class RootOverrideTests(CliTestCase):
         self.assertTrue(Path(path).is_file())
 
 
+class DefaultRootTests(CliTestCase):
+    """Without an override the store lives under $HOME/.agents/memgrove."""
+
+    def test_the_default_root_follows_the_home_directory(self):
+        home = self.root / "home"
+        home.mkdir()
+        with mock.patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+            os.environ.pop("MEMGROVE_ROOT", None)
+            code, text = self.run_cli(
+                "write",
+                "--scope",
+                "global",
+                "--path",
+                "a.md",
+                "--content",
+                "body",
+                "--if-version",
+                "new",
+            )
+        expected = home / ".agents" / "memgrove" / "global" / "a.md"
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(text)["path"], str(expected))
+        self.assertTrue(expected.is_file())
+        self.assertFalse((home / ".agents" / "memory").exists())
+
+
 class ConsolidationOnChangeTests(CliTestCase):
     """A change is consolidated before the command returns."""
 
