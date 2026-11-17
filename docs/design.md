@@ -7,9 +7,9 @@
 > plugin per agent.
 >
 > **Status:** implemented (version `0.4.0`, including Windows and a PyPI release). This document
-> describes the current design; where it disagrees with the code, `README.md` is the authority.
-> Dropped options (lexical retrieval, hooks, git history, extraction) are recorded here on purpose
-> so they are not proposed again.
+> describes the current design; where it disagrees with the code or the user-facing documents,
+> those are the authority. Dropped options (lexical retrieval, hooks, git history, extraction) are
+> recorded here on purpose so they are not proposed again.
 
 ---
 
