@@ -34,12 +34,11 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 | `memgrove/PROTOCOL.md` | guide for agents without an MCP client; `memgrove protocol` prints it |
 | `.github/workflows/` | the suite on Linux and Windows, and the tag-triggered release |
 | `docs/design.md` | the design and rejected options; §11 is the closed decisions |
-| `docs/operations.md` | this machine's state and setup |
-| `docs/roadmap.md` | history of what shipped |
+| `docs/roadmap.md` | the changelog: what each released version added |
 | `HANDOFF.md` | only while work is open: the current work order. Not in the tree today; create it when work opens and delete it when the list is empty |
 | `docs/research.md` | historical research on Claude Code and Qoder |
 
-- README and PROTOCOL are English; everything else is Persian, and so are the answers to the user.
+- README, PROTOCOL and `docs/` are English; the answers to the user are Persian.
 - Update README and `docs/` in the same change that alters behaviour, not in a later commit.
 - Do not reopen §11 of `design.md` without a new reason: no keyword search, no line cap on the
   index, no config file, MCP-only, consolidation after every change, the store stays local to one
@@ -56,16 +55,23 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 
 ## Release
 
-- The only version is `__version__` in `memgrove/__init__.py`, and the tag `v<version>` must equal
-  it; `release.yml` stops on a mismatch. The workflow then builds, publishes to PyPI through
-  Trusted Publishing, and creates the GitHub Release with the wheel and the sdist.
-- Never upload by hand and never store a PyPI token: the one-time trusted-publisher setup is in
-  `docs/operations.md`. Publishing is irreversible — a name and a version cannot be reused; rehearse
-  on TestPyPI instead.
-- The workflow runs on GitHub only. `origin` carries both push URLs (our own git server and
-  GitHub), so `git push origin main` and `git push origin v<version>` update both — the tag has to
-  be pushed too. A push that first adds `.github/workflows/` to GitHub needs a token with the
-  `workflow` scope; without it GitHub rejects the push and the tag never lands, so no release runs.
+- The version lives only in `__version__` in `memgrove/__init__.py`; the tag `v<version>` must equal
+  it, and `release.yml` stops on a mismatch. The workflow runs the suite on Linux and Windows,
+  builds the wheel and the sdist, publishes to PyPI through Trusted Publishing, and creates the
+  GitHub Release with both files attached.
+- Cut a release after a **complete change set** — one feature, one fix set, or one packaging change
+  that is finished and reviewed — not per commit. While the project is 0.x, a feature bumps the
+  minor version and a fix bumps the patch; a published version and name are never reused.
+- Before tagging: the suite is green on both operating systems, README and `docs/` describe what
+  ships, and any migration a user has to perform is written down. After tagging, watch the release
+  run; if it fails before the upload, rerun it, and if PyPI already took the version, fix forward
+  with a new version instead of deleting it.
+- Trusted Publishing is configured on PyPI for this repository, workflow `release.yml` and
+  environment `pypi`; no token is stored. If either name changes, update that PyPI record instead
+  of adding a token. Publishing is irreversible — rehearse a risky change on TestPyPI.
+- `origin` carries both push URLs (our git server and GitHub), so `git push origin main` and
+  `git push origin v<version>` update both; the tag has to be pushed too. Changing
+  `.github/workflows/` needs a token with the workflow scope; the current one has it.
 
 ## Git
 

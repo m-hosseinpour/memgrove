@@ -147,7 +147,8 @@ portable way to get it in front of the model without an adapter per client. No `
 section is needed.
 
 `cwd` exists for clients that run one server for several projects (DSH does); a per-project
-client can omit it and the server uses its own working directory.
+client can omit it and the server uses its own working directory. `MEMGROVE_PROJECT_CWD` sets
+that fallback for a client that cannot pass `cwd` at all.
 
 ## Manual usage
 
@@ -303,7 +304,7 @@ memgrove/migrate.py    import Claude Code's per-project notes and rebuild the in
 memgrove/cli.py        argparse surface
 memgrove/PROTOCOL.md  the agent-facing contract; `memgrove protocol` prints it, the shell saves it
 .github/workflows/     the test suite on Linux and Windows, and the tag-triggered release
-docs/                  research.md, design.md, roadmap.md, operations.md
+docs/                  design.md, research.md, roadmap.md
 tests/                 unittest (stdlib only)
 ```
 
@@ -324,13 +325,12 @@ python -m unittest discover -s tests -v
 A release is a tag. Bump `__version__` in `memgrove/__init__.py`, commit, and push `v<version>`:
 GitHub Actions runs the suite on Linux and Windows, builds the wheel and the sdist, uploads them
 to PyPI through Trusted Publishing, and creates the GitHub Release with both files attached
-(`.github/workflows/release.yml`). The one-time PyPI setup is in
-[`docs/operations.md`](docs/operations.md).
+(`.github/workflows/release.yml`). The versioning and release rules are in
+[`AGENTS.md`](AGENTS.md).
 
-Background and rationale: [`docs/`](docs/) — `research.md` (how Claude Code and Qoder actually
-work, and which claims are verified), `design.md` (the design and the alternatives dropped),
-`roadmap.md` (history), and `operations.md` (setup, env vars, and how to verify this machine).
-README and `PROTOCOL.md` are English; the documents under `docs/` are Persian.
+Background and rationale: [`docs/`](docs/) — `design.md` (the design and the alternatives
+dropped), `research.md` (how Claude Code and Qoder actually work, and which claims are verified),
+and `roadmap.md` (the changelog). All documents are English.
 
 ## Design notes
 

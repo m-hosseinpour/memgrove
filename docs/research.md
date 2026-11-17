@@ -1,73 +1,87 @@
-# حافظهٔ ایجنت‌ها: Claude Code و Qoder — تحقیق
+# Agent memory: Claude Code and Qoder — research
 
-> این سند **عکسِ لحظه‌ای از تحقیق** است، نه طرح. تصمیم‌های نهایی در `design.md` هستند و چند
-> چیزی که این‌جا شرح داده شده (انتخاب‌گر مدل‌محور، همگام‌سازی، استخراج) عمداً در پیاده‌سازی
-> ما کنار گذاشته شد. Qoder هم دیگر روی این ماشین نیست؛ بخشش فقط به‌عنوان مرجع مانده است.
+> This document is a **snapshot of research**, not a design. The final decisions live in
+> `design.md`, and several things described here (model-based selection, synchronization,
+> extraction) were deliberately left out of the implementation. Qoder is no longer installed on
+> the machine used for this research; its section remains as a reference only.
 >
-> تاریخ تحقیق: ۲۰۲۶-۱۰-۲۸ · Claude Code نسخهٔ `2.1.301` · Qoder نسخهٔ `1.1.75-hotfix.1`
-> روش: خواندن مستقیم فایل‌های روی دیسک، استخراج رشته‌های پرامپت از باندل نصب‌شده، و مستندات رسمی.
-> هر جا شاهدِ محلی با مستندات فرق دارد، صریح گفته شده. چیزهایی که تأیید نشده‌اند در بخش «تأیید نشده» آمده‌اند.
+> Research date: 2026-10-28 · Claude Code version `2.1.301` · Qoder version `1.1.75-hotfix.1`
+> Method: reading the files on disk directly, extracting prompt strings from the installed bundle,
+> and the official documentation. Wherever local evidence disagrees with the documentation, that is
+> stated explicitly. Anything unconfirmed appears in the "Unconfirmed" section.
 
 ---
 
-## ۰. یک تفکیک که همه‌چیز را روشن می‌کند
+## 0. One distinction that clarifies everything
 
-هر سه محصولی که «حافظه» صدایش می‌کنند، در واقع سه چیزِ متفاوت‌اند:
+All three products that call something "memory" are in fact talking about three different things:
 
-| لایه | چیست | مثال | چه کسی می‌نویسد |
+| Layer | What it is | Example | Who writes it |
 |---|---|---|---|
-| **دستورالعمل** (instructions) | قواعد ثابتِ کاری که هر سشن باید بداند | `CLAUDE.md`، `AGENTS.md`، `.qoder/rules` | انسان |
-| **حافظه** (memory) | واقعیت‌های بادوام دربارهٔ کاربر/پروژه که از تعامل استخراج می‌شوند | «این پروژه با pnpm ساخته می‌شود»، «کاربر پاسخ کوتاه می‌خواهد» | ایجنت (یا انسان) |
-| **دانش** (knowledge/RAG) | محتوای بیرونی یا ایندکس‌شدهٔ کد | Repo Wiki، Knowledge Base، ایندکس وکتوری | ابزار ایندکس‌کن |
+| **Instructions** | fixed working rules every session must know | `CLAUDE.md`, `AGENTS.md`, `.qoder/rules` | a human |
+| **Memory** | durable facts about the user/project, extracted from interaction | "this project is built with pnpm", "the user wants short answers" | the agent (or a human) |
+| **Knowledge** (knowledge/RAG) | external or indexed code content | Repo Wiki, Knowledge Base, a vector index | the indexing tool |
 
-اشتباهِ رایج این است که این سه در یک سبد ریخته شوند. Claude Code لایهٔ ۱ و ۲ را نسبتاً جدا نگه می‌دارد؛ Qoder لایهٔ ۲ و ۳ را در یک محصول «Memory/Knowledge Center» ادغام کرده. طراحی ما (سند `design.md`) عمداً فقط لایهٔ ۲ را هدف می‌گیرد و برای لایهٔ ۱ و ۳ قرارداد تعریف می‌کند، نه پیاده‌سازی.
+The common mistake is to throw all three into one basket. Claude Code keeps layers 1 and 2 fairly
+separate; Qoder merged layers 2 and 3 into a single "Memory/Knowledge Center" product. The design
+in `design.md` deliberately targets layer 2 only and defines a contract, not an implementation, for
+layers 1 and 3.
 
 ---
 
-## ۱. Claude Code
+## 1. Claude Code
 
-### ۱.۱ دو سیستم موازی
+### 1.1 Two parallel systems
 
-**الف) فایل‌های دستورالعمل (`CLAUDE.md`)** — دستی، همیشه در پرامپت.
+**a) Instruction files (`CLAUDE.md`)** — manual, always in the prompt.
 
-چهار scope دارد و به‌ترتیب از عام به خاص خوانده می‌شوند ([مستندات](https://docs.claude.com/en/docs/claude-code/memory)):
+There are four scopes, read from general to specific
+([documentation](https://docs.claude.com/en/docs/claude-code/memory)):
 
-1. managed policy: `/etc/claude-code/CLAUDE.md` (لینوکس)
+1. managed policy: `/etc/claude-code/CLAUDE.md` (Linux)
 2. user: `~/.claude/CLAUDE.md`
-3. project: `./CLAUDE.md` یا `./.claude/CLAUDE.md`
+3. project: `./CLAUDE.md` or `./.claude/CLAUDE.md`
 4. local: `./CLAUDE.local.md`
 
-نکات مهم که در رفتار واقعی هم دیده می‌شوند:
+Important points also visible in the actual behavior:
 
-- فایل‌ها **با هم جمع می‌شوند (concatenate)، روی هم سوار نمی‌شوند**؛ هیچ scope، scope دیگر را override نمی‌کند. نزدیک‌ترین به cwd آخر خوانده می‌شود.
-- فایل‌های زیرشاخه‌ها **به‌صورت on-demand** وقتی ایجنت در آن شاخه فایل می‌خواند/می‌نویسد بارگذاری می‌شوند.
-- `@path` برای import، حداکثر **۴ hop**؛ import هزینهٔ توکن را کم نمی‌کند.
-- فایل بزرگ‌تر از ۴MiB کلاً رد می‌شود؛ فایل‌های on-demand در ۴۰k/۲۰۰k کاراکتر بریده می‌شوند.
-- `.claude/rules/*.md` با frontmatter `paths:` برای قواعد محدود به مسیر.
-- `AGENTS.md` فقط وقتی خوانده می‌شود که `CLAUDE.md` وجود نداشته باشد (تنظیم `claude-md` | `claude-md-and-agents-md` | `managed-only`).
-- مسیر project-root پس از `/compact` دوباره از دیسک خوانده و تزریق می‌شود — یعنی فایل زنده است، نه snapshot.
+- Files are **concatenated, not layered**; no scope overrides another. The one closest to the cwd
+  is read last.
+- Files in subdirectories are loaded **on demand**, when the agent reads or writes a file in that
+  branch.
+- `@path` imports, at most **4 hops**; an import does not reduce the token cost.
+- A file larger than 4MiB is rejected outright; on-demand files are truncated at 40k/200k
+  characters.
+- `.claude/rules/*.md` with a `paths:` frontmatter, for path-scoped rules.
+- `AGENTS.md` is read only when `CLAUDE.md` does not exist (setting `claude-md` |
+  `claude-md-and-agents-md` | `managed-only`).
+- After `/compact` the project-root path is read from disk again and injected — the file is live,
+  not a snapshot.
 
-در همین ماشین: `~/.claude/CLAUDE.md` فقط یک خط است، `@~/.agents/AGENTS.md` — یعنی دستورالعمل واقعی در فایل مشترکِ ایجنت‌هاست و Claude Code فقط به آن ارجاع می‌دهد. این دقیقاً همان الگویی است که طراحی ما باید تقویت کند.
+On the machine used for this research, `~/.claude/CLAUDE.md` was a single line,
+`@~/.agents/AGENTS.md`: the real instructions live in the agents' shared file and Claude Code only
+refers to it. That is exactly the pattern the design should reinforce.
 
-**ب) حافظهٔ خودکار (auto memory)** — ایجنت خودش می‌نویسد.
+**b) Auto memory** — the agent writes by itself.
 
-مسیر: `~/.claude/projects/<sanitized-cwd>/memory/` — یعنی **per-project و بیرون از مخزن کد**. ساختار:
+Path: `~/.claude/projects/<sanitized-cwd>/memory/` — that is, **per project and outside the code
+repository**. The structure:
 
 ```
 memory/
-  MEMORY.md                     ← ایندکس: هر خط یک ارجاع یک‌خطی
+  MEMORY.md                     ← index: one reference line per memory
   websearch-dead-use-playwright.md
   kde-fontconfig-cache-crash.md
   feedback_commit_attribution.md
 ```
 
-`MEMORY.md` یک لیست خطی است، نه داکیومنت:
+`MEMORY.md` is a flat list, not a document:
 
 ```markdown
 - [WebSearch is dead — use Playwright](websearch-dead-use-playwright.md) — the built-in search tool returns nothing through the AvalAI proxy; drive DuckDuckGo in the browser instead
 ```
 
-و هر حافظه یک فایل markdown با frontmatter (نمونهٔ واقعی از همین ماشین):
+and each memory is a markdown file with frontmatter (a real sample from the research machine):
 
 ```yaml
 ---
@@ -81,134 +95,193 @@ metadata:
 ---
 ```
 
-بدنه، آزاد است ولی در عمل یک الگوی ثابت دارد: **چه چیزی + چرا + چطور اعمال شود**. فایل بالا حتی می‌گوید «این را با VPN دوباره تست نکن، در دو کشور تست شد» — یعنی حافظه هم *نتیجه* و هم *مرزِ تلاش مجدد* را ثبت می‌کند.
+The body is free-form, but in practice it follows a fixed pattern: **what + why + how to apply
+it**. The file above even says "do not test this again with a VPN, it was tested in two countries"
+— so memory records both the *result* and the *limit of retrying*.
 
-### ۱.۲ نوشتن: دو مرحله‌ای، نسخه‌دار، با دروازهٔ امنیتی
+### 1.2 Writing: two-step, versioned, with a safety gate
 
-از نسخهٔ نصب‌شده (استخراج از باندل) — این‌ها در مستندات عمومی **نیستند** ولی در بیلد وجود دارند:
+From the installed version (extracted from the bundle) — none of this is in the public
+documentation, but it exists in the build:
 
-- ابزارهای مدل‌رو به نام `MemoryRead` و `MemoryWrite` با پارامترهای `store`, `path`, `content`, `if_version`.
-- خواندن، یک **توکن نسخهٔ ۱۲ کاراکتری** و زمان آخرین تغییر برمی‌گرداند.
-- نوشتن، **قفل خوش‌بینانه (optimistic concurrency)** دارد: `if_version` یا توکنِ آخرین خواندن است یا کلمهٔ `new`. نوشتن با `new` روی مسیری که وجود دارد **رد می‌شود** — «تا محتوایی را که ندیده‌ای بازنویسی نکنی». تعارض و رد، محتوای فعلی را برمی‌گردانند تا ادغام کنی.
-- سقف ۱۰۰KB برای هر سند؛ محتوای خالی رد می‌شود.
-- نوشتن حاوی **راز/کلید** رد می‌شود؛ نوشتن در store اشتراکی ممکن است به بازبینی classifier نیاز داشته باشد.
-- **دروازهٔ مسیر**: backend حافظه خطاهای صریحی دارد برای مسیرهایی که از ریشهٔ حافظه بیرون می‌زنند — `Key escapes personal memory directory:`، `Key escapes personal memory directory via symlink:`، `Key targets an excluded personal-memory subtree:` و `LocalDirectoryBackend: write refused on read-only mount`. برای طراحیِ ما مهم است: هر نقشه‌ای که حافظهٔ بومی را به پوشهٔ بیرونی وصل کند، باید با همین بررسی‌ها سازگار باشد.
-- **دو مرحله**: اول سند نوشته می‌شود، بعد یک خط ارجاع به `MEMORY.md` اضافه می‌شود. اگر مرحلهٔ دوم جا بیفتد، حافظه هست ولی هرگز بازیابی نمی‌شود — یک حالت خرابی واقعی که Qoder هم با آن دست‌وپنجه نرم می‌کند.
+- Model-facing tools named `MemoryRead` and `MemoryWrite`, with the parameters `store`, `path`,
+  `content`, `if_version`.
+- A read returns a **12-character version token** and the last-modified time.
+- A write has **optimistic concurrency**: `if_version` is either the token from the last read or
+  the word `new`. A write with `new` to a path that exists is **refused** — "so you do not
+  overwrite content you have not seen". A conflict and a refusal both return the current content
+  for merging.
+- A 100KB cap per document; empty content is refused.
+- A write containing a **secret/key** is refused; a write to a shared store may require a
+  classifier review.
+- **Path gate**: the memory backend has explicit errors for paths that escape the memory root —
+  `Key escapes personal memory directory:`, `Key escapes personal memory directory via symlink:`,
+  `Key targets an excluded personal-memory subtree:` and
+  `LocalDirectoryBackend: write refused on read-only mount`. Relevant to this design: any scheme
+  that connects native memory to an outside folder must be compatible with these checks.
+- **Two steps**: the document is written first, then a reference line is added to `MEMORY.md`. If
+  the second step is missed, the memory exists but is never retrieved — a real failure mode Qoder
+  struggles with as well.
 
-مفاهیمی که در بیلد هست و در مستندات نیست:
+Concepts that are in the build but not in the documentation:
 
-- **store**: چند انبار جدا. «انبار شخصیِ این ماشین» (همان پوشهٔ پروژه)، و یک **انبار اشتراکی/تیمی** که بعضی وقت‌ها read-only است.
-- **همگام‌سازی** بین پوشهٔ محلی و انبار اشتراکی، با مدیریت تعارض («نسخهٔ محلی با نسخهٔ سرور جایگزین شد»)، و محافظت در برابر پاک‌شدن دسته‌ای («اگر n فایل هم‌زمان غیب شوند، احتمالاً پوشه پاک شده، نه اینکه عمداً حذف شده باشند»).
-- **`CLAUDE_MEMORY_STORES`** برای mount کردن store تیمی، در changelog رسمی تأیید شده.
-- کلید `autoDreamEnabled` و پاس تثبیت شبانه.
-- سوییچ «توقف auto-memory برای این سشن» در `/memory`.
+- **store**: several separate stores. "The personal store of this machine" (the project folder),
+  and a **shared/team store** that is sometimes read-only.
+- **Synchronization** between the local folder and the shared store, with conflict handling ("the
+  local version was replaced by the server version"), and protection against mass deletion ("if n
+  files disappear at once, the folder was probably wiped, not deliberately deleted").
+- **`CLAUDE_MEMORY_STORES`** for mounting a team store, confirmed in the official changelog.
+- The `autoDreamEnabled` key and the nightly consolidation pass.
+- A "stop auto-memory for this session" switch in `/memory`.
 
-سه کلید تنظیمات که در باندل توضیح دارند و کار را یکسره می‌کنند:
+Three settings keys that the bundle documents and that settle the question:
 
-| کلید | توضیح خودِ بیلد |
+| Key | The build's own description |
 |---|---|
-| `autoMemoryEnabled` | «Enable auto-memory for this project. When false, Claude will not read from or write to the auto-memory directory.» |
-| `autoMemoryDirectory` | مسیر سفارشی حافظه؛ پیش‌فرض `~/.claude/projects/<sanitized-cwd>/memory/`. در `projectSettings` به دلایل امنیتی نادیده گرفته می‌شود. |
-| `autoDreamEnabled` | «Enable background memory consolidation (auto-dream). When set, overrides the server-side default.» |
+| `autoMemoryEnabled` | "Enable auto-memory for this project. When false, Claude will not read from or write to the auto-memory directory." |
+| `autoMemoryDirectory` | a custom memory path; defaults to `~/.claude/projects/<sanitized-cwd>/memory/`. Ignored in `projectSettings` for security reasons. |
+| `autoDreamEnabled` | "Enable background memory consolidation (auto-dream). When set, overrides the server-side default." |
 
-نکتهٔ عملی: خاموش‌کردن واقعیِ حافظهٔ بومی با `autoMemoryEnabled: false` است — نه با نوشتن در `CLAUDE.md`. متن دستورالعمل، مدل را هدایت می‌کند ولی ابزار را از دستش نمی‌گیرد.
+A practical note: turning native memory off for real is done with `autoMemoryEnabled: false` — not
+by writing into `CLAUDE.md`. Instruction text steers the model but does not take the tool away
+from it.
 
-### ۱.۳ خواندن: انتخاب، نه جست‌وجوی برداری
+### 1.3 Reading: selection, not vector search
 
-هیچ ایندکس برداری‌ای در کار نیست. دو مکانیزم:
+There is no vector index involved. Two mechanisms:
 
-1. **انتخاب‌گر (selection)**: یک مرحلهٔ انتخابِ مدل‌محور که فقط `name` و `description` حافظه‌ها را می‌بیند و برای پرسش فعلی انتخاب می‌کند (پرامپتش در باندل با عبارت «You are selecting memories that will be useful…» شروع می‌شود). اینکه این مرحله دقیقاً یک ساب‌ایجنت مستقل است یا یک فراخوانی درون‌خطی، **تأیید نشد**؛ ولی وجودِ مرحله قطعی است. دو قاعدهٔ صریح در همان پرامپت: «فقط حافظه‌هایی را انتخاب کن که مطمئنی کمک می‌کنند؛ اگر شک داری، انتخاب نکن» و «روی *موضوعِ* پرسش تطبیق بده، نه روی هم‌پوشانی کلیدواژه‌ای».
-2. **ارجاع‌دهی اجباری**: محتوای بازیابی‌شده با دستور cites همراه است — جمله‌ای که از حافظه می‌آید باید داخل تگ `<cc-memory filenames="...">` بپیچد. (تگ `</ccmemory>` در changelog رسمی تأیید شده؛ جزئیات `filenames` فقط از باندل است.)
+1. **Selection**: a model-driven selection step that sees only each memory's `name` and
+   `description` and picks ones for the current prompt (its prompt in the bundle begins "You are
+   selecting memories that will be useful…"). Whether this step is a separate subagent or an
+   inline call was **not confirmed**; that the step exists is certain. Two explicit rules in that
+   prompt: "only select memories you are sure will help; if in doubt, do not select" and "match on
+   the *topic* of the prompt, not on keyword overlap".
+2. **Mandatory citation**: retrieved content comes with a citation instruction — a sentence drawn
+   from memory must be wrapped in a `<cc-memory filenames="...">` tag. (The `</ccmemory>` tag is
+   confirmed in the official changelog; the details of `filenames` come only from the bundle.)
 
-`MEMORY.md` در شروع سشن خوانده می‌شود (سقف ~۲۰۰ خط / ۲۵KB) و بقیه on-demand.
+`MEMORY.md` is read at session start (cap ~200 lines / 25KB) and the rest on demand.
 
-### ۱.۴ تثبیت: `autoDream`
+### 1.4 Consolidation: `autoDream`
 
-یک پاس پس‌زمینه که هر چند سشن یک‌بار اجرا می‌شود و حافظه‌ها را ادغام/پیرایش می‌کند. رشته‌های باندل: شمارش «سشن‌ها از آخرین تثبیت»، «حداقل لازم»، «فایل‌های نوشته‌شده»، «قفل گرفته شد»، «اگر وسط کار کشته شد، برگردان». در مستندات رسمی هیچ صفحه‌ای ندارد؛ در changelog هم فقط اثرش دیده می‌شود.
+A background pass that runs once every few sessions and merges/prunes memories. Bundle strings:
+counting "sessions since the last consolidation", "minimum required", "files written", "lock
+acquired", "if killed midway, roll back". It has no page in the official documentation; the
+changelog shows only its effect.
 
-این پاسخِ مستقیم به «پوسیدگی حافظه» است: بدون تثبیت، `MEMORY.md` پر از واقعیت‌های کهنه می‌شود و ایجنت با اطمینان اشتباه می‌کند — که از نداشتن حافظه بدتر است.
+This is the direct answer to "memory rot": without consolidation, `MEMORY.md` fills with stale facts
+and the agent is confidently wrong — worse than having no memory.
 
-### ۱.۵ نقاط اتصال (hooks)
+### 1.5 Hooks
 
-قرارداد: JSON روی stdin، خروجی JSON روی stdout، exit code 2 = بلاک. تزریق متن از طریق `hookSpecificOutput.additionalContext` با **سقف ۱۰٬۰۰۰ کاراکتر** ([مستندات](https://docs.claude.com/en/docs/claude-code/hooks)).
+The contract: JSON on stdin, JSON output on stdout, exit code 2 = block. Text injection goes
+through `hookSpecificOutput.additionalContext` with a **10,000-character cap**
+([documentation](https://docs.claude.com/en/docs/claude-code/hooks)).
 
-| رویداد | برای حافظه چه می‌کند |
+| Event | What it does for memory |
 |---|---|
-| `SessionStart` | تزریق ایندکس؛ روی `resume` هم دوباره اجرا می‌شود (`source: resume`) |
-| `UserPromptSubmit` | تزریق حافظه‌های مرتبط با همین پرسش؛ می‌تواند بلاک کند |
-| `Stop` / `SubagentStop` | استخراج در پایان نوبت (`decision: block` + `reason` نوبت را ادامه می‌دهد) |
-| `SessionEnd` | فقط ثبت/جمع‌بندی؛ JSON آن دور ریخته می‌شود |
-| `PreCompact` | فرصت ذخیرهٔ وضعیت پیش از فشرده‌سازی |
+| `SessionStart` | injects the index; it also runs again on `resume` (`source: resume`) |
+| `UserPromptSubmit` | injects memories relevant to this prompt; it can block |
+| `Stop` / `SubagentStop` | end-of-turn extraction (`decision: block` + `reason` continues the turn) |
+| `SessionEnd` | records/summarizes only; its JSON is discarded |
+| `PreCompact` | a chance to save state before compaction |
 
-نکتهٔ مهم برای طراحی: `additionalContext` در `Stop` به **ساب‌ایجنت** می‌رود نه والد؛ و متن تزریق‌شده در transcript ذخیره و در `--resume` بازپخش می‌شود — یعنی تزریقِ وابسته به زمان در resume کهنه می‌شود.
+An important design note: in `Stop`, `additionalContext` goes to the **subagent**, not the parent;
+and injected text is stored in the transcript and replayed on `--resume` — so an injection that
+depends on time is stale when it is resumed.
 
-### ۱.۶ چه چیزی را ذخیره می‌کند و چه چیزی را نه
+### 1.6 What it saves and what it does not
 
-تاکسونومی رسمی، همان چهار `type` است:
+The official taxonomy is those four `type`s:
 
-- `user` — نقش، تخصص، ترجیحات
-- `feedback` — تصحیح‌ها و رویکردهای تأییدشده
-- `project` — کار جاری، تصمیم‌ها، ددلاین‌ها، چیزهایی که از کد درنمی‌آید
-- `reference` — کجا دنبال چه چیزی بگردی
+- `user` — role, expertise, preferences
+- `feedback` — corrections and approved approaches
+- `project` — current work, decisions, deadlines, things the code does not show
+- `reference` — where to look for something
 
-و صریحاً **ذخیره نمی‌کند**: هر چیزی که از کد/گیت قابل استنتاج است، هر چیزی که `CLAUDE.md` گفته، و «هر سشن چیزی ذخیره نمی‌کند».
+And it explicitly **does not save**: anything inferable from the code or git, anything `CLAUDE.md`
+already says, and "not every session saves something".
 
-### ۱.۷ محدودیت‌ها و نقدها
+### 1.7 Limitations and criticism
 
-- **حافظه بین پروژه‌ها مشترک نیست** — issue [#36561](https://github.com/anthropics/claude-code/issues/36561)، [#39195](https://github.com/anthropics/claude-code/issues/39195)، [#44056](https://github.com/anthropics/claude-code/issues/44056).
-- **حافظهٔ تیمی وجود ندارد** — [#38536](https://github.com/anthropics/claude-code/issues/38536).
-- **حافظه به ساب‌ایجنت‌ها نمی‌رسد** (مگر fork) — مستندات خودش می‌گوید.
-- **`CLAUDE.md` متورم** — توصیهٔ خودِ مستندات زیر ۲۰۰ خط است؛ توصیهٔ عملی: progressive disclosure و انتقال رویه‌ها به skills.
-- **حذف shortcut `#`** در v2.0.70 → [#14868](https://github.com/anthropics/claude-code/issues/14868).
-- **هزینهٔ توکن ثابت** در هر سشن، بی‌توجه به ربط.
-- **بدون لایهٔ بازیابی واقعی** (BM25/برداری) — اتکا به انتخاب LLM روی description.
+- **Memory is not shared across projects** — issues
+  [#36561](https://github.com/anthropics/claude-code/issues/36561),
+  [#39195](https://github.com/anthropics/claude-code/issues/39195),
+  [#44056](https://github.com/anthropics/claude-code/issues/44056).
+- **There is no team memory** — [#38536](https://github.com/anthropics/claude-code/issues/38536).
+- **Memory does not reach subagents** (except forks) — its own documentation says so.
+- **A bloated `CLAUDE.md`** — the documentation itself recommends under 200 lines; the practical
+  advice is progressive disclosure and moving procedures into skills.
+- **The `#` shortcut was removed** in v2.0.70 →
+  [#14868](https://github.com/anthropics/claude-code/issues/14868).
+- **A fixed token cost** in every session, regardless of relevance.
+- **No real retrieval layer** (BM25/vector) — reliance on LLM selection over descriptions.
 
 ---
 
-## ۲. Qoder
+## 2. Qoder
 
-Qoder دو محصول حافظهٔ **جدا** دارد که نباید با هم اشتباه شوند.
+Qoder has two **separate** memory products, which must not be confused with each other.
 
-### ۲.۱ IDE Memory
+### 2.1 IDE Memory
 
-در `Settings → Memory`، دو scope با سوییچ مستقل ([مستندات](https://docs.qoder.com/qoder/memory)):
+In `Settings → Memory`, two scopes with independent switches
+([documentation](https://docs.qoder.com/qoder/memory)):
 
-- **Global memory**: «ترجیحات، عادت‌ها و context بلندمدت در همهٔ پروژه‌ها».
-- **Project memory**: «قواعد کدبیس، رویه‌های آموخته‌شده و context هر پروژه».
+- **Global memory**: "preferences, habits and long-term context across all projects".
+- **Project memory**: "codebase rules, learned procedures and per-project context".
 
-UI تعداد فایل‌ها، زمان آخرین به‌روزرسانی، «باز کردن پوشهٔ حافظه» و «پاک کردن حافظه» را نشان می‌دهد. نوشتن **پیش‌دستانه (proactive)** است: در حالت Agent می‌گویی «این را یادداشت کن» و Qoder ذخیره می‌کند؛ بعداً باید بخواهی که بازیابی کند. مرور در Knowledge Center با فیلتر maturity/category/project انجام می‌شود.
+The UI shows the number of files, the last update time, "open memory folder" and "clear memory".
+Writing is **proactive**: in Agent mode you say "remember this" and Qoder saves it; later you have
+to ask it to retrieve. Review happens in the Knowledge Center with maturity/category/project
+filters.
 
-روی دیسک: `~/.qoder/memory/` (global) و `~/.qoder/projects/<slug>/memory/` (project) — هر دو روی این ماشین خالی‌اند چون auto-memory خاموش است.
+On disk: `~/.qoder/memory/` (global) and `~/.qoder/projects/<slug>/memory/` (project) — both were
+empty on the research machine because auto-memory was off.
 
-### ۲.۲ CLI auto-memory — یک پورتِ تقریباً کلمه‌به‌کلمه از Claude Code
+### 2.2 CLI auto-memory — an almost word-for-word port of Claude Code
 
-این مهم‌ترین یافتهٔ تحقیق است: Qoder CLI همان ساختار Claude Code را دارد — `MEMORY.md`، همان سقف **۲۰۰ خط / ۲۵KB**، همان چهار `type` (`user|feedback|project|reference`)، همان کلید تنظیم `autoMemoryEnabled`، همان تزریق «سرِ MEMORY.md» در شروع و بارگذاری on-demand فایل‌های موضوعی ([CLI Memory](https://docs.qoder.com/cli/memory)).
+This is the most important finding of the research: the Qoder CLI has the same structure as Claude
+Code — `MEMORY.md`, the same **200 lines / 25KB** cap, the same four `type`s
+(`user|feedback|project|reference`), the same `autoMemoryEnabled` settings key, the same injection
+of the "head of MEMORY.md" at startup and on-demand loading of topic files
+([CLI Memory](https://docs.qoder.com/cli/memory)).
 
-تفاوت‌ها: خاموش‌به‌صورت‌پیش‌فرض (`QODER_MEMORY=1`)، یک «Memory Management Subagent» برای افزودن/حذف تکرار/مسیریابی، و `/remember` که پیشنهاد **ارتقا به `AGENTS.md`** می‌دهد. یعنی Qoder خودش می‌داند حافظه و دستورالعمل دو لایه‌اند و مسیر ارتقا دارد.
+The differences: off by default (`QODER_MEMORY=1`), a "Memory Management Subagent" for
+adding/removing duplicates/routing, and `/remember`, which suggests **promoting to `AGENTS.md`**.
+So Qoder itself knows that memory and instructions are two layers and offers a promotion path.
 
-### ۲.۳ rules — بالغ‌ترین لایهٔ Qoder
+### 2.3 rules — Qoder's most mature layer
 
-`AGENTS.md` + `.qoder/rules/**/*.md` با چهار تریگر ([مستندات](https://docs.qoder.com/cli/memory)):
+`AGENTS.md` + `.qoder/rules/**/*.md` with four triggers
+([documentation](https://docs.qoder.com/cli/memory)):
 
-| trigger | چه چیزی تزریق می‌شود |
+| trigger | what is injected |
 |---|---|
-| `always_on` | کل بدنه، همیشه |
-| `model_decision` | **فقط مسیر + description**؛ مدل خودش تصمیم می‌گیرد بخواند یا نه |
-| `glob` | بدنه، بعد از اولین برخورد با فایلِ منطبق |
-| `manual` | فقط با فراخوانی صریح |
+| `always_on` | the whole body, always |
+| `model_decision` | **only the path + description**; the model itself decides whether to read it |
+| `glob` | the body, after the first encounter with a matching file |
+| `manual` | only on an explicit call |
 
-`model_decision` معادلِ درستِ «ایندکس سبک + خواندن on-demand» است و مستقیماً در طراحی ما استفاده می‌شود.
+`model_decision` is the right equivalent of "a light index + on-demand reading" and is used
+directly in this design.
 
-### ۲.۴ موتور دانش — چیزی که Claude Code ندارد
+### 2.4 Knowledge engine — what Claude Code lacks
 
-- **Repo Wiki**: دانش تولیدشده برای هر مخزن، پیش‌فرض خاموش، تولید محلی، بدون آپلود کل کد ([Repo Wiki](https://docs.qoder.com/qoder/repo-wiki)).
-- **Knowledge Base**: فایل‌های کاربر (PDF/Word/Excel/… تا ۵۰۰MB) در scope کاربر یا workspace.
-- **ایندکس workspace**: خودکار زیر ۱۰٬۰۰۰ فایل؛ بردارها **در ابر** ساخته می‌شوند («فایل‌های آپلودشده بعد از ساخت بردار نابود می‌شوند، فقط بردار می‌ماند») ([Indexing](https://docs.qoder.com/qoder/indexing)).
-- پلاگین `qoder-context` با ابزارهای MCP: `SearchWorkspace` (پاسخ با شاهد فایل:خط) و `SearchKnowledge` (دانشِ تقطیرشده: معماری، پشته، قواعد) — هر دو `alwaysLoad` و `alwaysAllow`.
+- **Repo Wiki**: generated knowledge for each repository, off by default, generated locally, with
+  no upload of the whole codebase ([Repo Wiki](https://docs.qoder.com/qoder/repo-wiki)).
+- **Knowledge Base**: user files (PDF/Word/Excel/… up to 500MB) in user or workspace scope.
+- **Workspace index**: automatic under 10,000 files; vectors are built **in the cloud**
+  ("uploaded files are destroyed once the vectors are built; only the vectors remain")
+  ([Indexing](https://docs.qoder.com/qoder/indexing)).
+- The `qoder-context` plugin with MCP tools: `SearchWorkspace` (an answer with file:line evidence)
+  and `SearchKnowledge` (distilled knowledge: architecture, stack, rules) — both `alwaysLoad` and
+  `alwaysAllow`.
 
-### ۲.۵ قرارداد حافظه در SDK (از باندل نصب‌شده)
+### 2.5 The memory contract in the SDK (from the installed bundle)
 
-`@qoder-ai/qoder-agent-sdk` یک قرارداد صریح برای حافظه دارد — دقیق‌ترین چیزی که در این تحقیق دیدم:
+`@qoder-ai/qoder-agent-sdk` has an explicit contract for memory — the most precise thing found in
+this research:
 
 ```js
 options.memory = {
@@ -216,158 +289,214 @@ options.memory = {
   projectScope: boolean,
   userScope: boolean,
 
-  generation: {                 // نوشتن
+  generation: {                 // writing
     enabled, roots: [{ path, indexFile }],
-    prompt,                     // پرامپت استخراج قابل override
+    prompt,                     // overridable extraction prompt
     turnComplete: { enabled, shouldGenerate(input), timeoutMs, onGateError }
   },
 
-  consumption: {                // خواندن/تزریق
+  consumption: {                // reading/injection
     enabled,
     files: [{ id, path, required }],
-    maxTokens,                  // بودجهٔ توکن
+    maxTokens,                  // token budget
     overflow: "truncate" | "fail_query",
     failureMode: "best_effort" | "fail_query"
   }
 }
 ```
 
-و کانال گزارش: پیام‌های سیستمی `memory_generation` / `memory_consumption` با callback، به‌علاوهٔ دستورهای `flush_memory` و `refresh_memory`.
+And the reporting channel: `memory_generation` / `memory_consumption` system messages with a
+callback, plus the `flush_memory` and `refresh_memory` commands.
 
-سه چیز در این قرارداد قابل تقلید است:
+Three things in this contract are worth imitating:
 
-1. **جدایی generation از consumption** — نوشتن و خواندن دو چرخهٔ مستقل با تنظیمات مستقل.
-2. **بودجهٔ توکن صریح** برای تزریق، با سیاست سرریز مشخص.
-3. **دروازهٔ `shouldGenerate`** — قبل از هر استخراج، یک تابع تصمیم می‌گیرد «ارزش دارد یا نه»، با timeout و سیاست خطا. یعنی استخراج همیشه اجرا نمی‌شود.
+1. **Separating generation from consumption** — writing and reading are two independent cycles with
+   independent settings.
+2. **An explicit token budget** for injection, with a defined overflow policy.
+3. **The `shouldGenerate` gate** — before each extraction, a function decides "is it worth it",
+   with a timeout and an error policy. Extraction therefore does not always run.
 
-### ۲.۶ چهار مسیر رسیدن حافظه به پرامپت
+### 2.6 Four paths by which memory reaches the prompt
 
-1. **تزریق در شروع**: `AGENTS.md` + قواعد always-on + سرِ `MEMORY.md` (۲۰۰ خط/۲۵KB).
-2. **تزریق تنبل**: `AGENTS.md` زیرشاخه بعد از اولین خواندن؛ rules با `glob`؛ `model_decision` فقط مسیر+توضیح.
-3. **تزریق هر نوبت با hook**: پلاگین `qoder-context` در `SessionStart` و `UserPromptSubmit` یک «knowledge overview» تزریق می‌کند — در لاگ همین ماشین هر نوبت دیده می‌شود. یعنی Qoder بدون هیچ tool call، در هر پرسش context تزریق می‌کند.
-4. **فراخوانی ابزار**: `SearchWorkspace` / `SearchKnowledge`.
+1. **Injection at startup**: `AGENTS.md` + always-on rules + the head of `MEMORY.md` (200
+   lines/25KB).
+2. **Lazy injection**: the `AGENTS.md` of a subdirectory after the first read; rules with `glob`;
+   `model_decision` gives only the path + description.
+3. **Per-turn injection through a hook**: the `qoder-context` plugin injects a "knowledge overview"
+   at `SessionStart` and `UserPromptSubmit` — visible on every turn in the research machine's logs.
+   So Qoder injects context on every prompt without any tool call.
+4. **Tool calls**: `SearchWorkspace` / `SearchKnowledge`.
 
-### ۲.۷ محدودیت‌ها و شکایات
+### 2.7 Limitations and complaints
 
-- **شفافیت نداشتن حافظه**: نمای کلی فقط بخشی از مجموعه را نشان می‌دهد؛ حذف یک آیتم، آیتم‌های نامرئی قبلی را آشکار می‌کند؛ مدیریت گروهی و لیست کامل وجود ندارد ([forum 10654](https://forum.qoder.com/t/topic/10654)).
-- **ناسازگاری `MEMORY.md` با فایل موضوعی**: اگر فایل را ویرایش کنی ولی خط ایندکس/description را به‌روز نکنی، حافظه هرگز بازیابی نمی‌شود ([forum 13273](https://forum.qoder.com/t/topic/13273)) — همان حالت خرابیِ «دو مرحله‌ای» که Claude Code هم دارد.
-- **جابه‌جایی پوشهٔ پروژه = از دست رفتن حافظه** ([forum 3704](https://forum.qoder.com/t/where-do-memory-files-exist/3704)).
-- **حریم خصوصی**: بردارسازی کد در ابر؛ ذخیرهٔ کلید provider به‌صورت plaintext در `settings.json` (روی همین ماشین هم دیده شد — مقدارش ذکر نمی‌شود).
+- **Opaque memory**: the overview shows only part of the set; deleting one item reveals previously
+  invisible items; there is no bulk management and no full list
+  ([forum 10654](https://forum.qoder.com/t/topic/10654)).
+- **`MEMORY.md` out of sync with a topic file**: if you edit the file but do not update the index
+  line/description, the memory is never retrieved
+  ([forum 13273](https://forum.qoder.com/t/topic/13273)) — the same "two-step" failure mode Claude
+  Code has.
+- **Moving the project folder = losing the memory**
+  ([forum 3704](https://forum.qoder.com/t/where-do-memory-files-exist/3704)).
+- **Privacy**: code vectorization in the cloud; the provider key stored in plaintext in
+  `settings.json` (observed on the research machine as well — the value is not quoted).
 
-### ۲.۸ نسبت Qoder و Claude Code
+### 2.8 Qoder versus Claude Code
 
 | | Claude Code | Qoder |
 |---|---|---|
-| دستورالعمل | `CLAUDE.md` + imports + `.claude/rules` | `AGENTS.md` + `.qoder/rules` با ۴ تریگر |
-| حافظه | `projects/<slug>/memory/` + `MEMORY.md` + ابزارهای `Memory*` | پورتِ همان + یک محصول IDE جدا (global/project) |
-| بازیابی | انتخاب LLM روی description | همان + موتور دانش برداری برای کد |
-| تثبیت | `autoDream` | نامشخص/مستندنشده |
-| همگام‌سازی | store اشتراکی + sync engine | بردار ابری و Knowledge Base؛ حافظهٔ تیمی مستند نشده |
-| ابزار مدل | `MemoryRead`/`MemoryWrite` | بدون ابزار حافظه؛ فقط فایل + `/memory manage` |
+| instructions | `CLAUDE.md` + imports + `.claude/rules` | `AGENTS.md` + `.qoder/rules` with 4 triggers |
+| memory | `projects/<slug>/memory/` + `MEMORY.md` + the `Memory*` tools | a port of the same + a separate IDE product (global/project) |
+| retrieval | LLM selection over descriptions | the same + a vector knowledge engine for code |
+| consolidation | `autoDream` | unknown/undocumented |
+| synchronization | a shared store + a sync engine | cloud vectors and Knowledge Base; team memory not documented |
+| model tools | `MemoryRead`/`MemoryWrite` | no memory tools; files only + `/memory manage` |
 
-**نتیجهٔ کلیدی:** این دو، دو پیاده‌سازی از یک ایده‌اند که هر دو یک شکاف مشترک دارند — حافظه به ایجنت و به پروژه گره خورده است. هیچ‌کدام یک لایهٔ حافظهٔ **مستقل از ایجنت** ندارند. این دقیقاً همان چیزی است که طراحی ما پر می‌کند.
+**Key conclusion:** these two are two implementations of one idea, and both share one gap — memory
+is tied to the agent and to the project. Neither has a memory layer **independent of the agent**.
+That is exactly what this design fills.
 
 ---
 
-## ۳. چشم‌انداز: دیگران چه کرده‌اند
+## 3. Landscape: what others have done
 
-### ۳.۱ استانداردها: هنوز استانداردی وجود ندارد
+### 3.1 Standards: there is still no standard
 
-- **`AGENTS.md`** تنها چیزِ شبه‌استاندارد است: markdown ساده، بدون فیلد اجباری، حدود ۶۰ هزار مخزن، و خواننده‌های متعدد (Codex، opencode، Cursor، Gemini CLI، Copilot، goose، Amp و…). قیمومیتش با Agentic AI Foundation (بنیاد لینوکس) است ([agents.md](https://agents.md/)).
-- **اولویت‌بندی یکسان نیست.** opencode خودش این ترتیب را دارد: `AGENTS.md` محلی → `~/.config/opencode/AGENTS.md` → `~/.claude/CLAUDE.md`، و آرایهٔ `instructions[]` که glob و URL راه‌دور را هم می‌پذیرد ([opencode rules](https://opencode.ai/docs/rules/)). یعنی «همان فایل مشترک» با قواعد متفاوت خوانده می‌شود.
-- **MCP** استانداردِ *انتقال* است، ولی دو نوع چیز را متفاوت رفتار می‌کند: **tools** توسط مدل صدا زده می‌شوند و همه‌جا کار می‌کنند؛ **resources** توسط هاست (اپلیکیشن) ضمیمه می‌شوند و پشتیبانی‌شان اختیاری است. برای یک لایهٔ Portable، tools باید راه اصلی باشند و resource فقط امتیاز اضافه.
-- **حافظهٔ قابل‌حمل: هیچ مشخصاتِ تصویب‌شده‌ای وجود ندارد.** تلاش OMPI (Open Memory Protocol Initiative) در سطح draft v0.2 (اکتبر ۲۰۲۶) است، بدون پیاده‌سازی مرجع و بدون پذیرش. Cognee هم فرمت خروجی `COGX` را برای مهاجرت بین Mem0/Letta/Zep ساخته — یعنی خودِ اکوسیستم هم به «فرمت قابل‌حمل» به‌عنوان یک مشکل نگاه می‌کند.
+- **`AGENTS.md`** is the only quasi-standard: plain markdown, no required fields, about 60 thousand
+  repositories, and many readers (Codex, opencode, Cursor, Gemini CLI, Copilot, goose, Amp, …). It
+  is stewarded by the Agentic AI Foundation (Linux Foundation) ([agents.md](https://agents.md/)).
+- **Precedence is not uniform.** opencode itself has this order: local `AGENTS.md` →
+  `~/.config/opencode/AGENTS.md` → `~/.claude/CLAUDE.md`, plus an `instructions[]` array that also
+  accepts globs and remote URLs ([opencode rules](https://opencode.ai/docs/rules/)). So "the same
+  shared file" is read with different rules.
+- **MCP** is the standard for *transport*, but it treats two kinds of things differently: **tools**
+  are called by the model and work everywhere; **resources** are attached by the host (the
+  application) and their support is optional. For a portable layer, tools must be the main path and
+  resources only a bonus.
+- **Portable memory: there is no approved specification.** The OMPI (Open Memory Protocol
+  Initiative) effort is at draft v0.2 (October 2026), with no reference implementation and no
+  adoption. Cognee also built the `COGX` export format for migration between Mem0/Letta/Zep — so
+  the ecosystem itself treats "a portable format" as an open problem.
 
-نتیجه: طراحی ما نباید منتظر استاندارد بماند، ولی باید **سازگار با `AGENTS.md` و MCP** باشد — همان دو چیزی که همه می‌فهمند.
+The conclusion: the design should not wait for a standard, but must be **compatible with
+`AGENTS.md` and MCP** — the two things everyone understands.
 
-### ۳.۲ پیشینه: چه کسی چه کرده
+### 3.2 Prior art: who has done what
 
-| سیستم | انبار | نوشتن | بازیابی | مجوز |
+| System | Store | Writing | Retrieval | License |
 |---|---|---|---|---|
-| **mem0** | برداری (+گراف اختیاری) | استخراج LLM؛ از ۲۰۲۶ فقط ADD | ترکیب معنایی + BM25 + موجودیت | Apache-2.0 |
-| **Letta (MemGPT)** | بلوک‌های درون‌کانتکست + آرشیو برداری | ابزارهای ایجنت + ایجنت «خواب» | بلوک‌ها همیشه حاضر؛ آرشیو برداری | Apache-2.0 |
-| **Zep/Graphiti** | گراف زمانی با پنجرهٔ اعتبار | استخراج + dedupe؛ **باطل‌کردن به‌جای حذف** | معنایی + BM25 + گراف | Apache-2.0 |
-| **basic-memory** | markdown + SQLite + FastEmbed | انسان و LLM هر دو | FTS + برداری | **AGPL-3.0** |
-| **claude-mem** | SQLite + Chroma | **خودکار** با هوک → خلاصهٔ LLM | سه لایه (ایندکس → خلاصه → جزئیات) | Apache-2.0 |
-| **MemOS** | گراف + Qdrant؛ محلی SQLite | LLM + زمان‌بند async | FTS5 + برداری | Apache-2.0 |
-| **cognee** | گراف + برداری | remember/improve | مسیریابی گراف/برداری/کد | Apache-2.0 |
-| **Memory Bank (Cline/Roo)** | markdown داخل مخزن | ایجنت **کل فایل را بازنویسی می‌کند** | خواندن کامل فایل | community |
+| **mem0** | vector (+optional graph) | LLM extraction; since 2026, ADD only | semantic hybrid + BM25 + entities | Apache-2.0 |
+| **Letta (MemGPT)** | in-context blocks + vector archive | agent tools + a "sleep" agent | blocks always present; vector archive | Apache-2.0 |
+| **Zep/Graphiti** | a temporal graph with validity windows | extraction + dedupe; **invalidation instead of deletion** | semantic + BM25 + graph | Apache-2.0 |
+| **basic-memory** | markdown + SQLite + FastEmbed | both a human and an LLM | FTS + vector | **AGPL-3.0** |
+| **claude-mem** | SQLite + Chroma | **automatic**, via hooks → LLM summaries | three layers (index → summary → detail) | Apache-2.0 |
+| **MemOS** | graph + Qdrant; local SQLite | LLM + an async scheduler | FTS5 + vector | Apache-2.0 |
+| **cognee** | graph + vector | remember/improve | graph/vector/code routing | Apache-2.0 |
+| **Memory Bank (Cline/Roo)** | markdown inside the repository | the agent **rewrites the whole file** | reading the whole file | community |
 
-دو مشاهدهٔ مهم:
+Two important observations:
 
-1. **claude-mem** تقریباً همان چیزی است که این سند پیشنهاد می‌کند: هوک، SQLite، خلاصهٔ خودکار، و ادپتور برای Claude Code و opencode و Qoder و DSH. هر طراحی «از صفر» باید توضیح دهد چرا به‌جای استفاده/فورک آن، چیز جدیدی ساخته می‌شود. (بخش ۳.۶)
-2. **Memory Bank** نمونهٔ آموزشیِ ضدالگو است: بدون dedupe، بدون ایندکس، با بازنویسی کل فایل — و همان‌جاست که «پوسیدگی حافظه» بیشترین شکایت را دارد.
+1. **claude-mem** is almost exactly what this document proposes: hooks, SQLite, automatic
+   summaries, and adapters for Claude Code and opencode and Qoder and DSH. Any design "from
+   scratch" must explain why something new is built instead of using or forking it. (§3.6)
+2. **Memory Bank** is the textbook anti-pattern: no dedupe, no index, whole-file rewrites — and it
+   is where "memory rot" draws the most complaints.
 
-### ۳.۳ بازیابی: اعداد و آنچه واقعاً مهم است
+### 3.3 Retrieval: the numbers and what actually matters
 
-- در یک ارزیابی، ترکیب BM25 و برداری (۰٬۶۹۴) کمی بهتر از BM25 تنها (۰٬۶۶۱) و برداری تنها (۰٬۶۴۵) بود.
-- **اما در پرسش‌های شناسه‌محور (نام تابع، شمارهٔ خطا، پرچم CLI) BM25 با ۴۰ از ۴۰ برد، در حالی که برداری ۱۴ از ۴۰.** و برای همین کار، افزودن BM25 زمان را از ۴۲۱ms به ۷۸۱ms برد.
-- بودجه‌ها کوچک‌اند: mem0 حدود ۷ هزار توکن در هر پرسش؛ basic-memory بازرتبه‌بندی را پیش‌فرض خاموش می‌کند تا تأخیر کم شود.
-- برای انبار شخصی (چند صد تا چند هزار حافظه) هیچ ارزیابی مستقلِ head-to-head پیدا نشد — این یک شکاف واقعی در ادبیات است.
+- In one evaluation, combining BM25 and vectors (0.694) was slightly better than BM25 alone (0.661)
+  and vectors alone (0.645).
+- **But on identifier-shaped questions (a function name, an error number, a CLI flag) BM25 won 40
+  of 40, while vectors won 14 of 40.** And for that work, adding BM25 raised the time from 421ms to
+  781ms.
+- The budgets are small: mem0 about 7 thousand tokens per prompt; basic-memory turns reranking off
+  by default to keep latency low.
+- For a personal store (a few hundred to a few thousand memories) no independent head-to-head
+  evaluation was found — that is a real gap in the literature.
 
-**درس:** برای کار کدنویسی، پرسش‌ها بیشتر شناسه‌محورند تا معنایی. BM25/FTS5 باید پیش‌فرض باشد، نه برداری. این با طراحی ما هم‌خوان است.
+**Lesson:** for coding work, questions are mostly identifier-shaped rather than semantic.
+BM25/FTS5 should be the default, not vectors. That was consistent with the design at the time of
+the research.
 
-### ۳.۴ سطوح ادغام (که طراحی را محدود می‌کنند)
+### 3.4 Integration levels (which constrain the design)
 
-| ایجنت | تزریق context | ثبت/نوشتن | ابزار |
+| Agent | context injection | recording/writing | tools |
 |---|---|---|---|
-| **Claude Code** | هوک `SessionStart`/`UserPromptSubmit` با `additionalContext` | هوک `Stop`/`SessionEnd` | MCP |
-| **Qoder** | همان قرارداد هوک (به شکل Codex) | همان | MCP |
-| **opencode** | **مستندنشده.** تنها کانال واقعی: هوک `experimental.session.compacting` (می‌تواند `output.context` را پر کند یا prompt را جایگزین کند). بقیه: `event`، `tool{}` | هوک `event` | MCP + `instructions[]` |
-| **DSH** | رویداد `system-prompt/assemble` و `agent/created` | `agent/turn-stopping`، `session/event` | `tools.register` |
-| **هر چیز دیگر** | فایل دستورالعمل | ویرایش فایل | MCP |
+| **Claude Code** | the `SessionStart`/`UserPromptSubmit` hooks with `additionalContext` | the `Stop`/`SessionEnd` hooks | MCP |
+| **Qoder** | the same hook contract (in Codex form) | the same | MCP |
+| **opencode** | **undocumented.** The only real channel: the `experimental.session.compacting` hook (it can fill `output.context` or replace the prompt). The rest: `event`, `tool{}` | the `event` hook | MCP + `instructions[]` |
+| **DSH** | the `system-prompt/assemble` and `agent/created` events | `agent/turn-stopping`, `session/event` | `tools.register` |
+| **anything else** | the instruction file | editing files | MCP |
 
-این جدول یکی از انتخاب‌های طراحی را تحمیل می‌کند: **برای opencode نمی‌توان روی تزریق خودکار هر نوبت حساب کرد.** راه‌حل: `instructions[]` برای متن ثابت + ابزار MCP برای بازیابی + هوک فشرده‌سازی برای تداوم.
+This table forces one design choice: **for opencode, automatic per-turn injection cannot be
+relied on.** The answer: `instructions[]` for fixed text + an MCP tool for retrieval + a compaction
+hook for continuity.
 
-### ۳.۵ حالت‌های خرابی که در عمل مستند شده‌اند
+### 3.5 Failure modes documented in practice
 
-- **پوسیدگی و تناقض**: دلیل وجود «Dreams» در Anthropic همین است — انبارها پر از تکرار، تناقض و کهنه می‌شوند.
-- **آخرین نوشته برنده است**: Letta مستند می‌کند که نوشتن بلوک، جایگزینی کل مقدار است. claude-mem عمداً «یک نویسنده» را نگه می‌دارد تا تعارض بین چند ایجنت پیش نیاید.
-- **نشت راز**: سرورهای مرجع Graphiti صریحاً بدون auth و بدون محافظت تزریق پرامپت عرضه می‌شوند.
-- **استخراج بی‌قید**: claude-mem هر فراخوانی ابزار را می‌گیرد و ناچار شده تگ `<private>` و حذف پروژه‌ای اضافه کند.
-- **از دست رفتن حافظه در import**: OMPI یک threat model جدا برای «حافظه‌های فراموش‌شده که از مسیر import برمی‌گردند» دارد — دقیقاً همان چیزی که در طراحی ما با tombstone حل می‌شود.
+- **Rot and contradiction**: this is why "Dreams" exists in Anthropic's product — stores fill with
+  duplicates, contradictions and stale entries.
+- **Last write wins**: Letta documents that writing a block replaces the whole value. claude-mem
+  deliberately keeps "one writer" so that conflicts between several agents do not arise.
+- **Secret leakage**: Graphiti's reference servers ship explicitly without auth and without
+  prompt-injection protection.
+- **Unbounded extraction**: claude-mem captures every tool call and has been forced to add a
+  `<private>` tag and per-project exclusion.
+- **Losing memory on import**: OMPI has a separate threat model for "forgotten memories coming back
+  through an import path" — exactly the problem the design at the time solved with a tombstone.
 
-### ۳.۶ درس ساخت در برابر استفاده
+### 3.6 The lesson of building versus using
 
-سه گزینه واقعی وجود دارد:
+There are three real options:
 
-1. **استفاده از claude-mem** — بالغ، Apache-2.0، ادپتور برای همین چهار ایجنت. اما: SQLite+Chroma، خلاصهٔ خودکار به‌سبک جعبهٔ سیاه، و مالکیت فرمت داده در دست ابزار است.
-2. **فورک/توسعهٔ یکی از این‌ها** — سریع‌تر، ولی هر تغییر در قالب، فورک را از upstream دور می‌کند.
-3. **ساخت یک لایهٔ نازک روی قالب فایل مشترک** (پیشنهاد این سند) — هزینهٔ اولیه بیشتر، اما داده در markdown می‌ماند، هر ایجنت می‌تواند بدون ما هم بخواندش، و مهاجرت به هر ابزار دیگری یک `git clone` است.
+1. **Use claude-mem** — mature, Apache-2.0, adapters for these same four agents. But: SQLite +
+   Chroma, black-box-style automatic summaries, and the tool owns the data format.
+2. **Fork/extend one of them** — faster, but every change to the format drifts the fork away from
+   upstream.
+3. **Build a thin layer on the shared file format** (this document's proposal) — a higher initial
+   cost, but the data stays in markdown, any agent can read it even without this tool, and moving
+   to any other tool is a `git clone`.
 
-معیار انتخاب: اگر هدف «حافظهٔ بهتر برای خودم» است، گزینهٔ ۱ کافی است. اگر هدف «یک لایهٔ زیرساختی که سال‌ها مستقل از تغییر ایجنت‌ها بماند» است — که صورت مسئلهٔ این سند است — گزینهٔ ۳ توجیه دارد.
-
+The selection criterion: if the goal is a better memory for yourself, option 1 is enough. If the
+goal is "an infrastructure layer that stays independent of agent churn for years" — which is the
+problem statement of this document — option 3 is justified.
 
 ---
 
-## ۴. الگوهای قابل استفاده (استخراج از دو سیستم)
+## 4. Usable patterns (extracted from the two systems)
 
-> **ستون «در طراحی ما» طرحِ زمانِ این تحقیق است، نه وضعیت ساخته‌شده.** از آن زمان استخراج خودکار،
-> BM25، scope سشن، نوع‌های `decision`/`gotcha`، سقف ۲۰۰ خط/۲۵KB روی فهرست، job شبانه و SQLite
-> کنار گذاشته شدند. آنچه واقعاً ساخته شد [`design.md`](design.md) است.
+> **The "in this design" column is the plan at the time of the research, not the built state.**
+> Since then, automatic extraction, BM25, session scope, the `decision`/`gotcha` types, the
+> 200-line/25KB cap on the index, the nightly job and SQLite were dropped. What was actually built
+> is [`design.md`](design.md).
 
-| # | الگو | چرا مهم است | در طراحی ما |
+| # | Pattern | Why it matters | In this design |
 |---|---|---|---|
-| ۱ | **ایندکس کوچکِ همیشه‌حاضر + بدنهٔ on-demand** | سقف ۲۰۰ خط/۲۵KB هر دو سیستم تصادفی نیست؛ تعادل هزینهٔ توکن و دسترس‌پذیری است | همان، با ایندکس تولیدشده و سقف صریح |
-| ۲ | **نوشتن دو مرحله‌ای (سند + خط ایندکس)** | سند بدون ارجاع = حافظهٔ مرده | همان، ولی ایندکس از فرانت‌متر **بازتولید** می‌شود تا ناسازگار نشود |
-| ۳ | **تایپ حافظه** (`user/feedback/project/reference`) | به انتخاب‌گر و به تزریق اولویت می‌دهد | گسترش به `decision` و `gotcha` |
-| ۴ | **scope دوگانه (global/project)** | بیشترین فایده با کمترین نشتی | همان + scope سشن برای ژورنال |
-| ۵ | **استخراج در پایان نوبت، با دروازه** | استخراج بی‌قید = نویز و هزینه | همان، با دروازهٔ heuristic + سقف سشن |
-| ۶ | **انتخاب/بازیابی سبک قبل از تزریق** | تزریق همه‌چیز = تورم context | BM25 + اولویت‌ها، بدون LLM در مسیر داغ |
-| ۷ | **تثبیت دوره‌ای** | بدون آن، حافظه می‌پوسد | job شبانه + گزارش |
-| ۸ | **نسخه/provenance** | نوشتن هم‌زمان و بازنویسی کور را می‌بندد | هش محتوا + `if_version` + منبع |
-| ۹ | **ضدِّ تزریق در متن حافظه** | حافظه یک ورودیِ داده است، نه فرمان | نرمال‌سازی نشانه‌ها + «داده، نه دستور» |
-| ۱۰ | **فایل ساده روی دیسک** | قابل grep، قابل git، قابل ویرایش دستی | همان — با ایندکس مشتق‌شده در SQLite |
+| 1 | **a small always-present index + on-demand bodies** | the 200-line/25KB cap in both systems is not arbitrary; it balances token cost and availability | the same, with a generated index and an explicit cap |
+| 2 | **a two-step write (document + index line)** | a document without a reference = dead memory | the same, but the index is **regenerated** from the frontmatter so it cannot fall out of sync |
+| 3 | **memory types** (`user/feedback/project/reference`) | gives selection and injection a priority | extended to `decision` and `gotcha` |
+| 4 | **dual scope (global/project)** | the most benefit with the least leakage | the same + a session scope for a journal |
+| 5 | **end-of-turn extraction, with a gate** | unbounded extraction = noise and cost | the same, with a heuristic gate + a session cap |
+| 6 | **light selection/retrieval before injection** | injecting everything = context bloat | BM25 + priorities, no LLM on the hot path |
+| 7 | **periodic consolidation** | without it, memory rots | a nightly job + a report |
+| 8 | **version/provenance** | closes concurrent writes and blind overwrites | a content hash + `if_version` + origin |
+| 9 | **anti-injection in memory text** | memory is a data input, not a command | normalizing markers + "data, not instruction" |
+| 10 | **plain files on disk** | greppable, git-able, hand-editable | the same — with an index derived in SQLite |
 
 ---
 
-## ۵. چیزهایی که تأیید نشد (و نباید نقل شوند)
+## 5. Things that were not confirmed (and must not be quoted)
 
-- آستانه‌های `autoDream` (۵ سشن؟ چند ساعت؟) — فقط یک منبع اجتماعی.
-- نام دقیق `/pause-memory` و آستانهٔ چرخهٔ تثبیت.
-- اینکه «انتخاب‌گر» یک ساب‌ایجنت مستقل با پرامپت خودش است — پرامپتش در باندل هست، ولی معماری اجرایش تأیید نشد.
-- نگاشت دقیق `Settings → Memory` در IDE به همان پوشه‌های `~/.qoder/memory` (هر دو خالی‌اند و auto-memory خاموش است).
-- معنی «maturity» در Knowledge Center و اینکه رتبه‌بندی سمت سرور است یا نه.
-- محتوای واقعی `knowledge-edit-upload` (فقط metadata یا محتوا؟).
-- سقف ۱۰٬۰۰۰ حافظه / ۸ store مربوط به **Managed Agents** است، نه Claude Code محلی — این دو را نباید یکی گرفت.
-- وجود ابزارهای `MemoryRead`/`MemoryWrite` در مستندات تأیید نشد، ولی در باندلِ `2.1.301` صریحاً هست؛ changelog رسمی هم «حافظهٔ تیمی»، «استخراج حافظه» و «تعارض نوشتن حافظه» را تأیید می‌کند. یعنی مستندات از بیلد عقب‌تر است.
+- `autoDream`'s thresholds (5 sessions? how many hours?) — a social source only.
+- The exact name `/pause-memory` and the consolidation cycle's threshold.
+- That the "selector" is a separate subagent with its own prompt — its prompt is in the bundle, but
+  its execution architecture was not confirmed.
+- The exact mapping of `Settings → Memory` in the IDE to those `~/.qoder/memory` folders (both were
+  empty and auto-memory was off).
+- The meaning of "maturity" in the Knowledge Center, and whether ranking happens server-side.
+- The actual content of `knowledge-edit-upload` (metadata only, or content?).
+- The 10,000 memories / 8 stores cap belongs to **Managed Agents**, not local Claude Code — the two
+  must not be conflated.
+- The existence of the `MemoryRead`/`MemoryWrite` tools was not confirmed in the documentation, but
+  they are explicitly present in the `2.1.301` bundle; the official changelog also confirms "team
+  memory", "memory extraction" and "memory write conflicts". So the documentation lags the build.

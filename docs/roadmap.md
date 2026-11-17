@@ -1,172 +1,60 @@
-# نقشهٔ راه
+# Changelog
 
-> این سند **تاریخچه** است: چه فازهایی ساخته شد و چه چیزی در پایان باقی ماند. طرح فعلی در
-> `design.md` است، وضعیت روز در `operations.md`، و کار باز فعلی در مخزن نیست
-> (اگر باز شود، طبق `AGENTS.md` در `HANDOFF.md` نوشته می‌شود).
+What each released version added, newest first. Design decisions and the options that were
+rejected live in [`design.md`](design.md); the evidence behind them in [`research.md`](research.md).
+Versions before 0.4.0 were not tagged, so those sections group the work by the version in the code
+at the end of each phase.
 
-## P0 — انبار + CLI
+## 0.4.0 — first public release (2026-11-17)
 
-ساخته شد: ساختار `~/.agents/memory/` (که بعداً در ۰.۴.۰ به `~/.agents/memgrove/` رفت)، قالب فایل و
-فهرست، `memgrove` با `write`/`read`/`list`/
-`forget`/`index`، نسخه‌بندی خوش‌بینانه، رد راز، سقف ۱۰۰KB.
+- Published as `memgrove` on PyPI, with the wheel and the sdist attached to the GitHub Release.
+  The previous name, `agent-memory`, was refused by PyPI's similarity check: `ultranormalize_name`
+  drops `.`, `_` and `-` and maps `l`/`i` to `1` and `o` to `0`, so it collided with the existing
+  `agentmemory` project. Every punctuation variant was blocked the same way.
+- The rename covers the whole surface: distribution and module `memgrove`, console script
+  `memgrove`, MCP server `memgrove`, tools `memgrove_index` / `memgrove_read` / `memgrove_write`,
+  and the inputs `MEMGROVE_ROOT` / `MEMGROVE_PROJECT_CWD`.
+- The store root moved to `~/.agents/memgrove`. The data contract did not move with it:
+  `MEMORY.md`, the note format and the cwd-derived scope slug are unchanged, so an existing store
+  only needs the directory renamed.
+- Packaging and release: `hatchling` metadata, `memgrove protocol` so an installed wheel carries
+  the hand-wiring guide, a Linux/Windows suite matrix on Python 3.11–3.14, and a tag-triggered
+  `release.yml` that publishes through Trusted Publishing and attaches both artifacts to the
+  GitHub Release.
+- Fixed on the way to the release: the `--cwd` fallback in `migrate` compared Claude Code's
+  project directory case-sensitively, which never matched on Windows; both sides are now
+  normalized.
 
-## P1 — آداپتورها
+## 0.3.0 — Windows support
 
-ساخته شد و بعد **حذف** شد: هوک‌های Claude Code (`SessionStart`، `UserPromptSubmit`، `Stop`)،
-پلاگین V2 برای opencode، پلاگین cordis برای DSH. امروز فقط سرور MCP می‌ماند؛ هر ایجنتی که
-کلاینت MCP دارد همان را ثبت می‌کند.
+- The scope lock is one byte of `.memgrove.lock` on Windows, because Windows cannot lock a
+  directory handle; POSIX keeps the directory inode and creates no file.
+- Writes are always LF and reads accept CRLF, so one note has the same bytes on every OS.
+- `MEMORY.md` is reserved in any casing, because on a case-insensitive volume `memory.md` *is* the
+  index.
+- Scope slugs are built through `normcase`, so one project cannot get two scopes from two
+  spellings.
+- The CLI speaks UTF-8 on every stream, and `bin/memgrove.cmd` runs the checkout without
+  installing.
+- README restructured; MIT license and full package metadata added.
 
-## P2 — استخراج و تثبیت
+## 0.2.0 — imports and consolidation rules
 
-- **استخراج پایان سشن**: ساخته شد و حذف شد (نه Claude Code و نه Qoder چنین پاسی داشتند که
-  خواسته باشیم).
-- **تثبیت (`dream`)**: ساخته شد؛ نسخهٔ اول با شمارش سشن، قفل، `dream.log` و کامیت git بود.
-  امروز بدون هیچ‌کدام: بعد از هر تغییر همان scope تثبیت می‌شود.
+- `memgrove migrate` imports Claude Code's per-project notes into their own scope, skips the
+  generated index, and runs every note through the store's write path.
+- A rewrite changes only the fields the caller sends; an omitted `name`, `description` or `type`
+  keeps the file's value.
+- Duplicate descriptions merge at word-set equality (Jaccard 0.95 over at most 19 distinct words);
+  anything longer is left apart rather than guessed at.
+- An MCP tool call with an unknown argument is rejected instead of silently dropping it.
 
-## پس از ۰.۲.۰ — اصلاح بازنویسی
+## 0.1.0 — the store, the CLI and MCP
 
-بازنویسی با بدنهٔ تازه دیگر `name`/`description`/`type` را بازنشانی نمی‌کند: هر فیلدی که
-فراخوان نفرستد، مقدار فعلی فایل را نگه می‌دارد. کلیدهای فرانت‌مترِ دست‌نویس (مثل `title`) در
-بازنویسی دور ریخته می‌شوند؛ تصمیمش در design §۱۱ ثبت شده است.
-
-## پس از ۰.۲.۰ — آرگومان ناشناس MCP
-
-`tools/call` آرگومانی را که در اسکیمای ابزار نیست دیگر بی‌صدا دور نمی‌ریزد: پاسخ `-32602` است و
-هیچ فایلی نوشته نمی‌شود. قبلاً یک `cwdd` تایپ‌شده به‌جای `cwd` یادداشت را در scope پروژهٔ سرور
-می‌نشاند و همان `ok` را برمی‌گرداند.
-
-## پس از ۰.۲.۰ — آستانهٔ ادغام توصیف
-
-آستانهٔ شباهت از ۰٫۸ به ۰٫۹۵ رفت و به ۱۹ واژهٔ متمایز مقید شد: در این اندازه جفتی که یک واژه
-فرق دارد حداکثر ۰٫۹۴۷ می‌گیرد، پس فقط مجموعهٔ واژهٔ یکسان از آستانه رد می‌شود و یک قید اضافه
-(«… tag blue») دیگر یادداشت مستقل را حذف نمی‌کند. توصیف با بیش از ۱۹ واژه اصلاً برای شباهت
-مقایسه نمی‌شود تا حدس زده نشود.
-
-## پس از ۰.۲.۰ — فیلدهای یک‌خطی
-
-`name` و `description` (و تا پیش از حذف فیلد، `originSessionId`) دیگر خط‌شکن نمی‌پذیرند: پیش از
-هر نوشتنی با خطای `invalid` رد می‌شوند و نه فایلی ساخته می‌شود نه scope تازه‌ای. قبلاً مقدار در
-خط‌شکن بریده می‌شد و بقیه‌اش داخل فرانت‌متر می‌ماند. تصمیمش در design §۱۱ ثبت شده است.
-
-## پس از ۰.۲.۰ — حذف `originSessionId`
-
-فیلد منشأ سشن از قالب برداشته شد و `--session` از CLI: هیچ کلاینتی شناسهٔ سشن را به ابزار
-نمی‌داد، پس فیلد همیشه خالی نوشته می‌شد و منشأی را ادعا می‌کرد که نداشت. یادداشتِ نوشته‌شده با
-ابزار دیگر با همان فیلد خوانده می‌شود، ولی بازنویسی آن را می‌اندازد؛ کلیدهای دیگر `metadata`
-دست‌نخورده می‌مانند. تصمیمش در design §۱۱ ثبت شده است.
-
-## پس از ۰.۲.۰ — پاک‌سازی P3
-
-- `index.line_for`/`render`/`rebuild` دیگر پارامتر `prefix` ندارند: هیچ فراخوانی غیرخالی صدایشان
-  نمی‌زد.
-- `Memory.size` حذف شد؛ `store.load` آن را مقدار می‌داد و هیچ‌جا خوانده نمی‌شد.
-- هر نوشتن ایندکس را دو بار می‌ساخت (`index.rebuild` پیش از تثبیت و `_repair_index` در پایان).
-  حالا یک بار، در پایان پاس؛ اگر پاس پیش از آن بمیرد، `after_change` یک بازسازی ساده می‌کند تا
-  تغییر فراخوان در `MEMORY.md` دیده شود.
-- `_merge_body` خطوط خالی را دور می‌ریخت و پاراگراف‌های یادداشت قدیمی به هم می‌چسبیدند؛ حالا
-  بلوک‌به‌بلوک اضافه می‌شود و فاصله‌ها می‌مانند.
-- کامنت `mcp.py` که ادعا می‌کرد «verified against the MCP lifecycle spec»، حالا هر دو صفحهٔ
-  مشخصات (۲۰۲۵-۱۱-۲۵ و ۲۰۲۶-۰۷-۲۸) را لینک می‌دهد.
-- تست تازه: سقف ۱۰۰KB (رد بالای سقف، پذیرش دقیقاً روی سقف).
-
-## پس از ۰.۲.۰ — بسته‌شدن دو تصمیم باز
-
-هیچ کدی نخواستند، فقط تصمیم گرفته شد: انبار فقط روی همین ماشین می‌ماند (بدون remote و بدون
-انبار مشترک تیمی؛ پشتیبان‌گیری بیرون از ابزار) و `PROTOCOL.md` خودکار نمایش داده نمی‌شود
-(`instructions` و توضیح ابزارها کافی است). تصمیم‌ها در design §۱۱ ثبت شده‌اند و §۱۲ دیگر موردی
-ندارد.
-
-## پس از ۰.۲.۰ — مهاجرت از Claude Code
-
-`memgrove migrate` اضافه شد: یادداشت‌های `<claude-config>/projects/*/memory/` را در scope پروژهٔ
-خودشان وارد می‌کند (`--global user,feedback` برای انتقال نوع‌های عمومی)، `MEMORY.md` را کنار
-می‌گذارد و از `store.write` رد می‌کند تا بررسی راز، سقف ۱۰۰KB و قواعد نام/بدنه اجرا شوند.
-scope از cwd واقعیِ ثبت‌شده در لاگ سشن ساخته می‌شود، چون نام پوشهٔ Claude Code برگشت‌پذیر
-نیست (`~/.cache` آن‌جا `-home-u--cache` است و این‌جا `-home-u-.cache`)؛ بدون cwd یادداشت
-`invalid` می‌شود و نوشته نمی‌شود. `--dry-run` همان بررسی‌ها را بدون نوشتن اجرا می‌کند و
-`--cwd` پروژه را از cwd پیدا می‌کند. فایل موجود بازنویسی نمی‌شود: یکسان `exists` و متفاوت
-`collision` (خروجی ۱) است؛ یادداشتی که تثبیت قبلی زیر نام دیگری نگه داشته هم `exists` می‌شود،
-تا اجرای دوباره آن را برنگرداند. تثبیت یک‌بار در پایان هر scope اجرا می‌شود و
-`replaced`/`merged` نتیجه‌اش را گزارش می‌کنند. تصمیم‌ها در design §۹ ثبت شده‌اند.
-
-## ۰.۳.۰ — ویندوز و انتشار عمومی
-
-- قفل scope در ویندوز روی یک بایت از `.memgrove.lock` است، چون ویندوز هندل پوشه را قفل نمی‌کند؛
-  POSIX همان inode پوشه می‌ماند و فایلی نمی‌سازد.
-- نوشتن همیشه LF است (`newline="\n"`) و خواندن CRLF و CR را هم می‌فهمد؛ بدنهٔ ورودی پیش از
-  ذخیره یکسان می‌شود تا نسخهٔ یک یادداشت بین سیستم‌عامل‌ها یکی بماند.
-- `MEMORY.md` در هر بزرگی‌حروفی نام رزرو شد: روی فایل‌سیستم بی‌تفاوت به حروف، `memory.md` همان
-  ایندکس بود و یادداشت می‌توانست ایندکس را بازنویسی کند.
-- اسلاگ مسیر با `normcase` ساخته می‌شود تا یک پروژه در ویندوز دو scope نگیرد؛ `_claude_slug`
-  هم برای مقایسهٔ نام پوشه همین کار را می‌کند.
-- CLI روی stdin/stdout/stderr با UTF-8 و بدون ترجمهٔ خط کار می‌کند (کنسول ویندوز در غیر این
-  صورت یادداشت فارسی را نمی‌نوشت) و `memgrove --version` اضافه شد.
-- `bin/memgrove.cmd` برای اجرای بدون نصب در ویندوز اضافه شد؛ `python -m memgrove` مسیر مشترک هر دو
-  سیستم‌عامل است.
-- README بازچینش شد (Install و MCP بالای «استفادهٔ دستی»)، بخش ویندوز گرفت، لایسنس MIT و
-  متادیتای کامل `pyproject.toml` اضافه شد.
-
-## ۰.۴.۰ — انتشار روی PyPI
-
-- `PROTOCOL.md` از ریشهٔ مخزن به `memgrove/` رفت و داخل wheel هم می‌رود؛ `memgrove protocol` آن را چاپ
-  می‌کند تا کاربری که از PyPI نصب می‌کند هم راهنمای اتصال دستی را داشته باشد. کد خودش فایل را
-  در انبار نمی‌سازد؛ خروجی را shell می‌نویسد (design §۱۱).
-- `.github/workflows/ci.yml`: تست روی لینوکس و ویندوز با پایتون ۳٫۱۱ تا ۳٫۱۴، به‌علاوهٔ ساختن
-  wheel و sdist و نصب و اجرای هر دو در محیط تمیز.
-- `.github/workflows/release.yml`: با push تگ `v<نسخه>` — تست، تطبیق تگ با `memgrove.__version__`،
-  بیلد، انتشار روی PyPI با Trusted Publishing، و GitHub Release با هر دو artifact. هیچ توکنی
-  ذخیره نمی‌شود.
-- README از «clone و `uv tool install .`» به `uv tool install memgrove` (یا `pipx`) تغییر
-  کرد و نصب از چک‌اوت به بخش توسعه رفت. روش ریلیز در `operations.md` است.
-- نام پروژه از `agent-memory` به `memgrove` رفت: PyPI با چکِ `ultranormalize_name` هر نامی را که
-  به `agentmem0ry` برسد (یعنی `agent-memory`، `agent_memory`، `agent.memory`، `agent-mem`، و
-  خودِ `agentmemory` که پروژه‌ای موجود است) «too similar» رد می‌کند. با این تغییر، نام پکیج،
-  ماژول (`memgrove/`)، دستور (`memgrove`)، نام سرور MCP و سه ابزار آن (`memgrove_index`،
-  `memgrove_read`، `memgrove_write`) و ورودی‌ها (`MEMGROVE_ROOT`، `MEMGROVE_PROJECT_CWD`) یکی
-  شدند. خود انبار در آن کامیت دست‌نخورده ماند و بعد در همین نسخه از `~/.agents/memory` به
-  `~/.agents/memgrove` منتقل شد؛ اما `MEMORY.md`، قالب یادداشت و اسلاگ scope عوض نشدند: آن‌ها
-  قرارداد داده‌اند، نه نام ابزار.
-- اولین انتشار در ۲۰۲۶-۱۱-۱۷ انجام شد: تگ `v0.4.0` → تست روی لینوکس و ویندوز، wheel و sdist روی
-  PyPI، و GitHub Release با هر دو فایل. پیش از آن CI روی ویندوز یک ایراد واقعی پیدا کرد: تطبیق
-  نام پوشهٔ پروژه در `migrate` روی ویندوز به‌خاطر بزرگی/کوچکی حروف شکست می‌خورد و اصلاح شد.
-
-## آنچه در پایان ماند
-
-| جزء | وضعیت |
-|---|---|
-| انبار markdown + `MEMORY.md` | هست |
-| `memgrove` CLI | هست (`write`, `read`, `list`, `forget`, `index`, `mcp`, `protocol`, `dream`, `migrate`) |
-| سرور MCP | هست (`memgrove_index`, `memgrove_read`, `memgrove_write`) |
-| توزیع | هست: wheel/sdist روی PyPI و GitHub Release، با تست CI روی لینوکس و ویندوز |
-| تثبیت بعد از هر تغییر | هست، قطعی، idempotent |
-| بازیابی لغوی / انتخاب‌گر | نیست (حذف شد) |
-| سقف خط فهرست | نیست (حذف شد) |
-| هوک و پلاگین اختصاصی ایجنت | نیست (حذف شد) |
-| تاریخچهٔ git، `.state/`، `dream.log`، `config.toml` | نیست (حذف شد) |
-
-## معیار پذیرش نسخهٔ فعلی
-
-- [x] یک یادداشت نوشته می‌شود، بلافاصله در `MEMORY.md` دیده می‌شود، و در همان فرمان تثبیت
-      می‌شود (بدون پاس بعدی).
-- [x] اجرای دوبارهٔ تثبیت هیچ تغییری نمی‌دهد.
-- [x] نوشتن هم‌زمان با نسخهٔ کهنه رد می‌شود و محتوای فعلی را برمی‌گرداند.
-- [x] متن حاوی کلید/توکن نوشته نمی‌شود.
-- [x] `memgrove_index` همهٔ یادداشت‌ها را نشان می‌دهد (بدون برش).
-- [x] یک یادداشت که از راه همان `memgrove mcp` نوشته شد (همان کاری که DSH می‌کند)، از Claude Code
-      و opencode هم خوانده می‌شود — در ۲۰۲۶-۱۰-۲۹ تأیید شد (با نام‌های قدیمی، پیش از تغییر نام به
-      `memgrove`): نوشتن و خواندن روی یک انبار موقت، با
-      Claude Code 2.1.301 (`claude -p`) و opencode 2.2.0 (`opencode run`). هر سه کلاینت
-      `memgrove mcp` را بدون env اجرا می‌کنند، پس انبار پروژه هم یکی است.
-- [x] داده با `cat` و `grep` خوانا و قابل مهاجرت است.
-- [x] مهاجرت از Claude Code تکرارپذیر است: اجرای دوم یادداشت یکسان را دوباره نمی‌نویسد
-      (`exists`) و محتوای متفاوت را `collision` گزارش می‌کند.
-- [x] هیچ استیت یا فایل پیکربندی‌ای برای نگهداری نیست.
-
-## ریسک‌ها
-
-| ریسک | کاهش |
-|---|---|
-| کلاینت MCP، `instructions` را نادیده بگیرد | ابزارها خودشان توضیح دارند؛ `PROTOCOL.md` برای اتصال دستی هست |
-| فهرست با صدها یادداشت بزرگ شود | یک خط برای هر یادداشت؛ بدنه‌ها on-demand خوانده می‌شوند |
-| تثبیت اشتباه یک یادداشت را حذف کند | حذف فقط با تطبیق نسخه؛ بدون تاریخچه، تنها راه بازنویسی دستی است (پذیرفته شد) |
-| تغییر قالب توسط ایجنت دیگر | قالب markdown ساده + `PROTOCOL.md` |
+- The markdown store: one note per file, a generated `MEMORY.md` index, and the four note types.
+- CLI: `write`, `read`, `list`, `forget`, `index`, `mcp`, `dream`.
+- MCP server with `memory_index` / `memory_read` / `memory_write` (renamed in 0.4.0), one stdio
+  surface for every client.
+- Optimistic versioning via `if_version`, a secret-pattern refusal, and a 100KB body cap.
+- An earlier iteration also shipped per-agent hooks and plugins, background transcript extraction,
+  and a git history for the store; all were removed because each added a moving part without
+  improving retrieval or writing.
