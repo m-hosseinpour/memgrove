@@ -23,10 +23,25 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: run the suite
+        shell: bash
         env:
           MEMGROVE_ROOT: ${{ runner.temp }}/memgrove-test
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m unittest discover -s tests -v
+        run: |
+          set +e
+          python -m unittest discover -s tests -v > "$RUNNER_TEMP/unit.log" 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            # Annotations on a public repository are readable without signing
+            # in, so a failing window or Windows job stays diagnosable from
+            # outside the browser. Percent is the workflow-command escape.
+            grep -E '^(FAIL|ERROR):|Error:|AssertionError' "$RUNNER_TEMP/unit.log" \
+              | head -25 \
+              | sed 's/%/%25/g; s/\r//g' \
+              | while IFS= read -r line; do echo "::error::$line"; done
+            tail -60 "$RUNNER_TEMP/unit.log"
+          fi
+          exit "$status"
 
   package:
     runs-on: ubuntu-latest
