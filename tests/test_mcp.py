@@ -222,6 +222,64 @@ class ToolsListTests(McpTestCase):
         # swallow the first call.
         self.assertIn("loading a skill", tools["memgrove_index"]["description"])
 
+    def test_required_arguments_are_named_in_prose(self):
+        """A client can show a description without the input schema, so an
+        argument that lives only in the schema invites a guess. A session read
+        with `scope` and `name` — both plausible, neither real — and failed
+        before retrying with `store` and `path`.
+
+        A bare `assertIn("store", description)` would not catch that: the prose
+        says "shared store" and "consolidates the store" anyway. Each phrase
+        below names the argument, so a rewrite that drops the name fails."""
+        _, responses, _ = self.serve([self.request("tools/list")])
+        tools = {tool["name"]: tool for tool in responses[0]["result"]["tools"]}
+        named = {
+            "memgrove_read": {
+                "store": "identified by store ('global' or 'project')",
+                "path": (
+                    "path (the flat .md file name shown in the index, "
+                    "not the note's name)"
+                ),
+            },
+            "memgrove_write": {
+                "store": "at store and path",
+                "path": "at store and path",
+                "content": "content is the full replacement body",
+                "if_version": "if_version is required",
+            },
+        }
+        for name, phrases in named.items():
+            self.assertEqual(
+                set(tools[name]["inputSchema"]["required"]),
+                set(phrases),
+                msg=f"{name}: add a phrase for every required argument",
+            )
+            description = tools[name]["description"]
+            for argument, phrase in phrases.items():
+                self.assertIn(
+                    phrase, description, msg=f"{name} does not name {argument}"
+                )
+
+        # The property is the other surface that has to say it.
+        self.assertIn(
+            "not the note's name",
+            tools["memgrove_read"]["inputSchema"]["properties"]["path"]["description"],
+        )
+
+        # The instructions are the portable surface: a client may drop the
+        # descriptions, but the bootstrap text reaches every MCP client.
+        init = self.serve(
+            [self.request("initialize", {"protocolVersion": "2025-06-18"})]
+        )[1][0]["result"]
+        self.assertIn(
+            "memgrove_read takes two required arguments: store",
+            init["instructions"],
+        )
+        self.assertIn(
+            "memgrove_write takes the same store and path",
+            init["instructions"],
+        )
+
     def test_the_param_table_matches_the_schemas(self):
         """_TOOL_PARAMS decides what an unknown argument is, so it must not
         drift from the published properties."""

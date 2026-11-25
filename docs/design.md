@@ -129,7 +129,8 @@ One path only: **the complete index, then reading the body.**
 
 1. `memgrove_index` builds the index of both scopes from the files and returns it — with no line
    cap, so that no note stays hidden.
-2. The agent picks the line that fits its task and fetches the body with `memgrove_read`.
+2. The agent picks the line that fits its task and fetches the body with `memgrove_read`, passing
+   the store and the file name from the index as `path`.
 
 That first call is itself part of the contract: `instructions` asks for it as the session
 bootstrap — **on the first user turn in context**, before acting on that turn (even if the turn
@@ -176,6 +177,10 @@ Rules:
 - **An argument outside the schema is refused** (`-32602`, no file written): a client that follows
   `additionalProperties: false` sends nothing but the parameters above, and ignoring a `cwdd` would
   silently file the note in the server's project scope instead of the intended one.
+- **The required names are repeated in prose**: `instructions` and the tool descriptions name
+  `store`, `path`, `content` and `if_version`, because a client can show a description without the
+  input schema and a guessed argument is a failed call. The schema stays the authority;
+  `additionalProperties: false` still refuses a misspelt name.
 - Deletion is not among the MCP tools; only the CLI (`memgrove forget`). The reason is in §11.
 
 ## 8. Consolidation (dream)

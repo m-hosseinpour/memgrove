@@ -47,15 +47,19 @@ DSH — `~/.dsh/cordis.patch.yml` (rewrite the file live, no restart needed):
 | `memgrove_read` | `store`, `path`, `cwd?` | name, body, version, modified, type, description |
 | `memgrove_write` | `store`, `path`, `content`, `if_version`, `name?`, `description?`, `type?`, `cwd?` | the new version, after the touched scope is consolidated |
 
-The server's usage contract — the two scopes, the four types, what not to save, `if_version` —
-travels in the MCP `instructions` field of `initialize` / `server/discover`, which is what that
-field is for. It opens with the session bootstrap: on the first user turn in the context, before
-acting on it — even when the turn begins by loading a skill or reading files — call
-`memgrove_index` with `cwd`; **once per conversation**, since a later user message is not a new
-session, and again only after a compaction or a resume that did not carry the index, when it is no
-longer in context. MCP has no channel that pushes the index into a client's context, so this
-contract is the portable way to get it in front of the model without an adapter per client. No
-`AGENTS.md` section is needed.
+The server's usage contract — the two scopes, the four types, what not to save, the required
+argument names (`store`, `path`, and on write `content` and `if_version`) — travels in the MCP
+`instructions` field of `initialize` / `server/discover`, which is what that field is for. It opens
+with the session bootstrap: on the first user turn in the context, before acting on it — even when
+the turn begins by loading a skill or reading files — call `memgrove_index` with `cwd`; **once per
+conversation**, since a later user message is not a new session, and again only after a compaction
+or a resume that did not carry the index, when it is no longer in context. MCP has no channel that
+pushes the index into a client's context, so this contract is the portable way to get it in front
+of the model without an adapter per client. No `AGENTS.md` section is needed.
+
+The tool descriptions repeat the required argument names, because a client can surface a
+description without the full input schema; the schema stays the authority and still refuses a name
+outside it.
 
 ## Choosing the project
 
