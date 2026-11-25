@@ -737,6 +737,13 @@ class ProtocolTests(CliTestCase):
         self.assertEqual(code, 0)
         self.assertEqual(text, shipped.read_text(encoding="utf-8"))
         self.assertIn("memgrove_index", text)
+        # The guide is also the no-MCP fallback; it must name the same
+        # arguments as the tools, or a manual agent guesses `scope`/`name`.
+        self.assertIn("takes `store`", text)
+        self.assertIn(
+            "`memgrove_write` takes `store`, `path`, `content` and `if_version`", text
+        )
+        self.assertIn("The CLI labels `store`", text)
         # A guide, not the JSON contract the mutating commands follow.
         self.assertFalse(text.lstrip().startswith("{"))
 
