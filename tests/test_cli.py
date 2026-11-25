@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -746,6 +747,24 @@ class ProtocolTests(CliTestCase):
         self.assertIn("The CLI labels `store`", text)
         # A guide, not the JSON contract the mutating commands follow.
         self.assertFalse(text.lstrip().startswith("{"))
+
+
+class VersionSourceTests(unittest.TestCase):
+    """The version has one source; the build reads it instead of repeating it."""
+
+    def test_pyproject_reads_the_version_from_the_package(self):
+        pyproject = tomllib.loads(
+            (Path(cli.__file__).resolve().parents[1] / "pyproject.toml").read_text(
+                encoding="utf-8"
+            )
+        )
+        project = pyproject["project"]
+        self.assertEqual(project["dynamic"], ["version"])
+        self.assertNotIn("version", project)
+        self.assertEqual(
+            pyproject["tool"]["hatch"]["version"]["path"],
+            "memgrove/__init__.py",
+        )
 
 
 class CliErrorShapeTests(CliTestCase):

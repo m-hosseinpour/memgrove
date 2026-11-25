@@ -47,6 +47,7 @@ Issues = "https://github.com/m-hosseinpour/memgrove/issues"
 memgrove = "memgrove.cli:main"
 
 [tool.hatch.version]
+# The only version literal; the package, CLI and MCP server read it from here.
 path = "memgrove/__init__.py"
 
 [tool.hatch.build.targets.wheel]

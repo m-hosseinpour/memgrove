@@ -5,6 +5,20 @@ rejected live in [`design.md`](design.md); the evidence behind them in [`researc
 Versions before 0.4.0 were not tagged, so those sections group the work by the version in the code
 at the end of each phase.
 
+## 0.4.2 — clearer tool arguments (2026-11-25)
+
+- The MCP `instructions` and the `memgrove_read` / `memgrove_write` descriptions now name every
+  required argument: `store` and `path` for read; `store`, `path`, `content` and `if_version` for
+  write. `path` is the file name, not the note's `name`, and the "two scopes" wording is tied to
+  the `store` argument.
+- `memgrove/PROTOCOL.md` gets the same names, the CLI mapping (`--scope`, `--path`, `--content` /
+  `--content-file`, `--if-version`) and the optional `cwd`.
+- A test pins the argument-naming phrases, so dropping a required name fails the suite.
+- The live version reference in `docs/design.md` is gone: `__version__` in
+  `memgrove/__init__.py` remains the only version literal, `pyproject.toml` resolves it through
+  hatch, and a test keeps that path in place.
+- No schema, store format or CLI/MCP behavior changed.
+
 ## 0.4.1 — documentation restructure (2026-11-17)
 
 - `README.md` cut from 380 lines to about 120: it now carries only the path a new reader follows
