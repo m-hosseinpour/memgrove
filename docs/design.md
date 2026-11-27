@@ -231,8 +231,8 @@ field and tool schemas appear only after it searches. A session there started wi
 even though the server was connected (observed 2026-11-27). MCP has no channel that pushes context,
 so a lifecycle hook is the only reliable path for such a client. The hook is deliberately thin: it
 calls `memgrove hooks run context` / `codex`, so `index.render` and every store rule stay in one
-place. Other clients keep the MCP server and get a hook only when one is shown to hide the
-instructions; Claude Code and DSH are not covered yet.
+place. Other clients keep the MCP server and get a hook when one is shown to hide the instructions
+or a user asks for it; Claude Code and DSH are not covered yet.
 
 ### Why the symlink bridge was dropped
 
@@ -300,12 +300,12 @@ does not change the store.
   it ever becomes a real target, is a fresh reason to reopen this decision. (Closed 2026-11-05)
 - No automatic extraction; the agent writes with `memgrove_write`.
 - The read/write surface is MCP; the only out-of-protocol piece is a thin per-client hook that
-  loads the index, and it calls the CLI so no store rule is duplicated. A hook is added only for a
-  client observed to hide `instructions` and MCP tools at session start; Codex is the first
-  (`SessionStart` command hook), OpenCode the second (plugin that adds the index to the model's
-  system context).
-  Other clients keep MCP and are not given a hook on speculation. (Reopened 2026-11-27: Codex
-  deferred MCP tools, so the old "instructions are enough" assumption failed in a real session.)
+  loads the index, and it calls the CLI so no store rule is duplicated. A hook is added for a
+  client observed to hide `instructions` and MCP tools at session start, or for one whose user asks
+  for it; Codex is the first (`SessionStart` command hook), OpenCode the second (plugin that adds
+  the index to the model's system context). Other clients keep MCP and are not given a hook on
+  speculation. (Reopened 2026-11-27: Codex deferred MCP tools, so the old "instructions are enough"
+  assumption failed in a real session.)
 - No settings file; `MEMGROVE_ROOT` and `MEMGROVE_PROJECT_CWD` are the only inputs.
 - A rewrite changes only the fields the caller sends: `name`, `description` and `type` keep the
   file's current value when omitted (fresh file: the filename, an empty string, `project`). Other
