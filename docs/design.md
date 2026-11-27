@@ -45,7 +45,7 @@
 | a 200-line / 25KB cap on the index | the index is the only retrieval path; truncating it hides notes rather than saving context |
 | lexical retrieval and a selection threshold | a complete index plus on-demand reading is enough; word overlap without a model does not understand relevance and mostly duplicates the index |
 | background extraction from the transcript | neither Claude Code nor Qoder had such a pass worth asking for; the agent itself writes |
-| a hook or plugin per agent | MCP is enough for any agent with an MCP client; one adapter, not four |
+| a hook or plugin per agent | MCP is enough for any agent with an MCP client; only a client observed to hide `instructions`/tools at session start gets a thin index hook, not a second interface |
 | a section in `AGENTS.md` introducing the system | the MCP `instructions` do that and travel with the server |
 | git history in the store | Claude Code had no rollback either; consolidation deletes only on a version match, so history is not needed |
 | `.state/`, session counting, `dream.log` | consolidation runs after every change; no state is left to count (the lock, if any, is only short-lived — the directory inode on POSIX or `.memgrove.lock` on Windows — not a state file) |
@@ -57,30 +57,32 @@
 **History:** the first version, P0–P2, had all of these (lexical retrieval with a threshold, the
 `SessionStart` and `UserPromptSubmit` hooks, the opencode and DSH plugins, end-of-session
 extraction, git history). All were removed in the 2026-10-28 revision, because each added a
-moving part without making retrieval or writing better.
+moving part without making retrieval or writing better. The index-loading half of the hook came
+back in 0.5.0 for Codex and OpenCode after Codex was observed to defer MCP tools; retrieval and
+transcript extraction did not.
 
 ## 4. Architecture
 
 ```
-   Claude Code          opencode             DSH
-   (MCP client)        (MCP client)      (mcp-client)
-        └───────────────────┼───────────────────┘
-                            │  stdio, JSON-RPC
-                   ┌────────▼─────────────────┐
-                   │  memgrove mcp            │   ← the only agent interface
-                   │  index · read            │
-                   │  write                   │
-                   └────────┬─────────────────┘
-                            │
-                   ┌────────▼─────────────────┐
-                   │  ~/.agents/memgrove/     │
-                   │  markdown, no state      │
-                   └──────────────────────────┘
+   Codex · Claude Code · opencode · DSH
+        (MCP clients; Codex and opencode also run an index hook)
+                        │  stdio, JSON-RPC
+               ┌────────▼─────────────────┐
+               │  memgrove mcp            │   ← the read/write interface
+               │  index · read            │
+               │  write                   │
+               └────────┬─────────────────┘
+                        │
+               ┌────────▼─────────────────┐
+               │  ~/.agents/memgrove/     │
+               │  markdown, no state      │
+               └──────────────────────────┘
 ```
 
-`memgrove` (the same package) is the only place logic lives. The CLI is for humans and scripts, not
-an adapter. `PROTOCOL.md` is the written contract for an agent that has no MCP client and has to
-connect by hand.
+`memgrove` (the same package) is the only place logic lives. MCP is the read/write interface; the
+few lines in `hooks/` and the generated launcher only load the index through the same CLI, so they
+are not a second interface. The CLI is for humans, scripts and those hooks. `PROTOCOL.md` is the
+written contract for an agent that has no MCP client and has to connect by hand.
 
 There are three MCP tools: `memgrove_index`, `memgrove_read`, `memgrove_write`. Consolidation
 (`dream`) is not a separate tool; it runs on the same scope automatically after every write.
@@ -127,30 +129,29 @@ The index format:
 
 One path only: **the complete index, then reading the body.**
 
-1. `memgrove_index` builds the index of both scopes from the files and returns it — with no line
-   cap, so that no note stays hidden.
+1. The index is built from the files in both scopes — with no line cap, so that no note stays
+   hidden.
 2. The agent picks the line that fits its task and fetches the body with `memgrove_read`, passing
    the store and the file name from the index as `path`.
 
-That first call is itself part of the contract: `instructions` asks for it as the session
-bootstrap — **on the first user turn in context**, before acting on that turn (even if the turn
-begins by loading a skill or reading files), **once per conversation** (the user's next message is
-not a new session), and again only when the index is no longer in context (after a compaction, or
-in a resumed session whose earlier turns were not carried) — because MCP has no channel for
-injecting the index into the context, and the alternative is an adapter per agent. Automating it
-here therefore means an agent-agnostic contract, not guaranteed injection; the second is possible
-only with client-side code.
+The index reaches the model through a client hook for Codex and OpenCode, and through an explicit
+`memgrove_index` call for a client that has no hook. The hook is the only channel that can push
+context — MCP has none — and `instructions` no longer carries a session-start ritual. Codex runs a
+`SessionStart` command hook on `startup`, `resume`, `clear`, `compact` and `fork`, so the index
+returns after a compaction. OpenCode's plugin adds the text to the system instructions of each model
+request and refreshes its cache on every prompt, so a write mid-session is visible without a tool
+call and a compaction is covered by the next request.
 
-The session boundary is not observable to the model — `instructions` and the system prompt are the
-same on every turn — so a trigger of "before the first action in the session" would never fire at a
-moment the model could recognize; the trigger was tied to "the first user turn in context" instead.
-The other candidate is the client's own start ritual: an instruction to act "before the first
-action" in the client's instruction file (global or project) that does not name memory (OpenCode's
-skill gate is one) could take its place; that is why the `instructions` text names this case
-explicitly.
+Both hooks call `memgrove hooks run context` / `codex`, which render through `index.render`; the
+generated launcher pins the interpreter and package location the installer ran from, so a client
+with a minimal PATH still reaches the same code. The hook is a loader, not a second retrieval path.
 
-There is no lexical search, no model-based selector, and no automatic injection. The cost of the
-index is paid once, and bodies cost something only when they are needed.
+There is no lexical search, no model-based selector, and no transcript extraction. The index is
+built once per prompt and added to the system instructions of every model request by the OpenCode
+plugin, so its tokens are paid on each request; Codex receives it at `SessionStart` and after a
+compaction. A client without a hook sees the index only when it calls `memgrove_index`; Claude Code
+and DSH are in that group in this release. A very large index can still exceed a model's context
+window — the store does not truncate it, and the OpenCode plugin stops reading above 16 MiB.
 
 ## 7. Writing
 
@@ -209,17 +210,25 @@ Rules:
 
 | Agent | How |
 |---|---|
-| **Claude Code** | register the MCP server + `autoMemoryEnabled: false` in `~/.claude/settings.json` |
-| **opencode** | register the MCP server in `~/.config/opencode/opencode.json` |
-| **DSH** | one `@deepseek-ai/dsh-mcp-client` row in `~/.dsh/cordis.patch.yml` |
+| **Codex** | MCP server in `~/.codex/config.toml` + `memgrove hooks install codex`; trust the hook once in `/hooks` |
+| **opencode** | MCP server in `~/.config/opencode/opencode.json` + `memgrove hooks install opencode` (an auto-discovered plugin) |
+| **Claude Code** | register the MCP server + `autoMemoryEnabled: false` in `~/.claude/settings.json`; no index hook yet |
+| **DSH** | one `@deepseek-ai/dsh-mcp-client` row in `~/.dsh/cordis.patch.yml`; no index hook yet |
 | **any other agent** | MCP if it has one; otherwise hand it `PROTOCOL.md` manually |
 
 **Why not `AGENTS.md`:** that file is read in full in every session and must stay short. The MCP
 `instructions` carry the same guidance along with the server and are not duplicated across agents.
 
-**Why not a per-agent plugin or hook:** the only thing they did was inject the index at session
-start and retrieve on every prompt; with retrieval dropped and standard MCP `instructions`, the
-server itself provides both.
+**Why hooks now, after they were removed:** the earlier hooks injected the index at session start
+and retrieved on every prompt; the retrieval half was dropped, and the index half looked covered by
+standard MCP `instructions`. Codex breaks that assumption: when tool search is enabled it serves MCP
+tools as deferred — the model sees the server name and a short description, and the `instructions`
+field and tool schemas appear only after it searches. A session there started without the index
+even though the server was connected (observed 2026-11-27). MCP has no channel that pushes context,
+so a lifecycle hook is the only reliable path for such a client. The hook is deliberately thin: it
+calls `memgrove hooks run context` / `codex`, so `index.render` and every store rule stay in one
+place. Other clients keep the MCP server and get a hook only when one is shown to hide the
+instructions; Claude Code and DSH are not covered yet.
 
 ### Why the symlink bridge was dropped
 
@@ -262,7 +271,10 @@ does not change the store.
 | a secret leak | the check before the write |
 | a multiline `description`/`name` | refused before the write; the frontmatter is line-based |
 | context bloat | a one-line index plus reading the body only when it is needed |
-| memory executed as an instruction | `instructions` and `PROTOCOL.md` state plainly "reference, not instruction" |
+| an untrusted Codex hook | Codex skips it; the session runs without the index until `/hooks` trusts it |
+| a hook whose launcher or interpreter no longer exists | re-run `memgrove hooks install <client>` after moving the checkout or the installation, or set `MEMGROVE_BIN` for the OpenCode plugin |
+| a stale hook after an upgrade | re-run `memgrove hooks install <client>`; the installer replaces the old memgrove entry |
+| memory executed as an instruction | `instructions`, the hook text and `PROTOCOL.md` state plainly "reference, not instruction" |
 | the agent's native memory writing at the same time | `autoMemoryEnabled: false` |
 | earlier native memory that has to be moved | `memgrove migrate` (project scope by default; `--dry-run` to preview) |
 | the project cwd not found in the session log | the notes are reported `invalid` and not written; migrate that project with `--cwd` |
@@ -283,7 +295,13 @@ does not change the store.
   a shell can run `memgrove forget`; only a client with no shell at all cannot, and that case, if
   it ever becomes a real target, is a fresh reason to reopen this decision. (Closed 2026-11-05)
 - No automatic extraction; the agent writes with `memgrove_write`.
-- A single adapter: MCP. No hooks and no per-agent plugin.
+- The read/write surface is MCP; the only out-of-protocol piece is a thin per-client hook that
+  loads the index, and it calls the CLI so no store rule is duplicated. A hook is added only for a
+  client observed to hide `instructions` and MCP tools at session start; Codex is the first
+  (`SessionStart` command hook), OpenCode the second (plugin that adds the index to the model's
+  system context).
+  Other clients keep MCP and are not given a hook on speculation. (Reopened 2026-11-27: Codex
+  deferred MCP tools, so the old "instructions are enough" assumption failed in a real session.)
 - No settings file; `MEMGROVE_ROOT` and `MEMGROVE_PROJECT_CWD` are the only inputs.
 - A rewrite changes only the fields the caller sends: `name`, `description` and `type` keep the
   file's current value when omitted (fresh file: the filename, an empty string, `project`). Other
@@ -309,7 +327,9 @@ does not change the store.
   evidence from a client that ignored `instructions`, not on a guess. (Closed 2026-10-29) — The
   addition of 2026-11-17 does not reopen it: the file ships inside the package and
   `memgrove protocol` prints it only on an explicit request (its output is written by the shell at
-  the store root), because a PyPI install has no checkout for the user to copy from.
+  the store root), because a PyPI install has no checkout for the user to copy from. The
+  2026-11-27 hook work does not reopen it either: the hook injects the index, not the protocol
+  file.
 
 ## 12. Open decisions
 

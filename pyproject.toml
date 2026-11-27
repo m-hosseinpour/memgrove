@@ -13,11 +13,14 @@ license-files = ["LICENSE"]
 authors = [{ name = "Mahdi Hosseinpour" }]
 keywords = [
   "ai-agents",
+  "chatgpt",
   "claude-code",
+  "codex",
   "coding-agents",
   "deepseek",
   "deepseek-harness",
   "dsh",
+  "hooks",
   "local-first",
   "markdown",
   "mcp",

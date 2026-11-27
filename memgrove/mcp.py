@@ -6,9 +6,11 @@ The 2026-07-28 revision retired that handshake in favour of per-request _meta
 and answers server/discover instead; that probe is implemented here too, so a
 modern-only client is not locked out. Tools are served identically either way.
 
-The server is the whole agent-facing surface: `memgrove_index` returns the table
-of contents, `memgrove_read` loads one note, `memgrove_write` saves one. There is no
-keyword search — the index lists every note, and the agent picks.
+The server is the agent-facing read/write surface: `memgrove_index` returns the
+table of contents, `memgrove_read` loads one note, `memgrove_write` saves one.
+The index is also loaded by the per-client hooks in `hooks/`, because a client
+that defers MCP tools may never show `instructions` at session start. There is
+no keyword search — the index lists every note, and the agent picks.
 
 Nothing here may write to stdout except JSON-RPC responses. A stray print is
 invisible harm: the client simply stops understanding the stream. All
@@ -66,40 +68,21 @@ INTERNAL_ERROR = -32603
 # Claude Code has one memory per project, so the scope sentence is the one place
 # it cannot be the model: it is Qoder's global/project split, spelled out because
 # a note's type says what it is, not where it belongs.
-# The first sentence is a bootstrap, not a suggestion: MCP has no channel that
-# pushes the index into a client's context, so a per-client adapter is the only
-# alternative — and the contract has to stay agent-agnostic.
 #
-# "Once per conversation" is load-bearing, not style. The earlier wording
-# ("never answer from an index you saw only in an earlier context") was read by
-# a model as "any earlier turn", so it re-took the index at the start of every
-# new user task — one measured session took it on 6 of 7 messages with no
-# compaction anywhere in the record. The repeat costs a round trip and buys
-# nothing, because the index the client already holds is in the same context.
-#
-# The trigger is the first user turn in the context, not "the session": a
-# session's start is invisible to a model — instructions and system prompt are
-# identical at every turn — so "before your first action in a session" never
-# fires at a moment the model can recognise. The first user turn is observable.
-# The other half is arbitration: a client's own opening ritual can claim the
-# same "before the first action" slot without mentioning memory (OpenCode's
-# skill gate does), and a session that begins by loading a skill skipped the
-# index. Naming that case here keeps the two from displacing each other;
-# ordering them is the client's business, not the store's.
+# The index is not requested here. A client that defers MCP tools (Codex does)
+# may keep this field hidden until the model searches, so a "call index first"
+# sentence never fires. Codex and OpenCode load the index through a hook instead
+# (`memgrove hooks install ...`), and other clients are added the same way. The
+# instructions therefore describe what the store is and how to use it; they do
+# not carry a session-start ritual.
 INSTRUCTIONS = (
     "Shared memory store for coding agents: plain markdown notes on disk, one "
     "note per file, shared by every agent connected to this store.\n"
     "\n"
-    "Session bootstrap: take the index once per conversation — on the first "
-    "user turn in this context, before you act on that turn, and whether or not "
-    "you begin by loading a skill or reading files, call memgrove_index with cwd "
-    "set to the session's working directory, then memgrove_read the notes that "
-    "apply. A later user message in the same conversation is not a new session "
-    "and needs no second call: the result stays usable while it is still in the "
-    "context. Call it again only when the index is no longer there at all — "
-    "after a compaction, or in a session resumed without its earlier turns — "
-    "and never answer from an index the context no longer holds. The index is "
-    "cheap and uncapped; a note's description says when it applies.\n"
+    "The index (memgrove_index) is the store's table of contents: one line per "
+    "note, grouped by type, across the global and the project store. A note's "
+    "description says when it applies; read its body with memgrove_read before "
+    "relying on it. The index is cheap and uncapped.\n"
     "\n"
     "memgrove_read takes two required arguments: store ('global' or 'project') "
     "and path (the flat .md file name shown in the index, not the note's name).\n"
@@ -169,13 +152,9 @@ def _tool_definitions() -> list[dict[str, Any]]:
             "description": (
                 "List the notes in the shared store: a one-line entry per memory "
                 "(title, file name, description), grouped by type, for the global "
-                "and the project store. Call it on the first user turn in this "
-                "context, before acting on that turn, whether or not you begin "
-                "by loading a skill or reading files, and again only once the "
-                "index is no longer in context — never on each new user message; "
-                "pass cwd when the server serves several projects. Read an entry "
-                "with memgrove_read(store, path) before relying on it; path is the "
-                ".md file name shown for the entry."
+                "and the project store. Pass cwd when the server serves several "
+                "projects. Read an entry with memgrove_read(store, path) before "
+                "relying on it; path is the .md file name shown for the entry."
             ),
             "inputSchema": {
                 "type": "object",

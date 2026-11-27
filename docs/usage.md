@@ -24,11 +24,20 @@ memgrove dream --all               # every project scope
 memgrove migrate --dry-run         # Claude Code notes: preview, write nothing
 memgrove mcp                       # the MCP server on stdio
 memgrove protocol                  # print PROTOCOL.md, the hand-wiring guide
+memgrove hooks install codex       # Codex SessionStart hook
+memgrove hooks install opencode    # OpenCode plugin
 memgrove --version
 ```
 
 Pass `--cwd /path/to/project` to act on another project, and `--scope global` for the global
 store.
+
+`memgrove hooks install <client>` merges the index hook into the client's configuration and writes a
+small launcher, instead of replacing unrelated settings; `--dry-run` reports what would change
+without writing. The runtime entry points (`memgrove hooks run codex` and `memgrove hooks run
+context`) are called by the client, not by a person; both print the same index and read/write
+contract. See [agents.md](agents.md#hooks) for the Codex trust step and the OpenCode plugin
+location.
 
 Exit codes: `0` ok, `1` invalid input, `2` version conflict (the current content is returned so
 the caller can merge), `3` content looked like a secret and was refused. `migrate` uses the same

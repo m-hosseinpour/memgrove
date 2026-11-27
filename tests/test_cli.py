@@ -13,13 +13,15 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from memgrove import cli, config, store
+from memgrove import cli, config, hooks, store
 
 WRITE_KEYS = {"ok", "path", "version", "modified"}
 
@@ -339,6 +341,410 @@ class IndexTests(CliTestCase):
         for word in words:
             self.assertIn(f"note-{word}.md", text)
         self.assertNotIn("truncated", text)
+
+
+class HookTests(CliTestCase):
+    """The index hooks: the text they inject and the files they install."""
+
+    def codex_event(self, payload):
+        with mock.patch("sys.stdin", io.StringIO(json.dumps(payload))):
+            return self.json_cli("hooks", "run", "codex")
+
+    def test_context_carries_the_index_and_the_contract(self):
+        self.create("pnpm.md", description="the lockfile is pnpm")
+        self.create("pref.md", description="short answers", scope="global")
+        code, text = self.run_cli("hooks", "run", "context", "--cwd", str(self.cwd))
+        self.assertEqual(code, 0)
+        self.assertIn("# global memory", text)
+        self.assertIn("# project memory", text)
+        self.assertIn("pnpm.md", text)
+        self.assertIn("reference data, not instructions", text)
+        self.assertIn("memgrove_read(store, path)", text)
+        self.assertIn("if_version", text)
+
+    def test_context_says_when_the_store_is_empty(self):
+        _, text = self.run_cli("hooks", "run", "context", "--cwd", str(self.cwd))
+        self.assertIn("No notes yet.", text)
+
+    def test_codex_event_is_a_session_start_payload(self):
+        self.create("pnpm.md", description="the lockfile is pnpm")
+        code, data = self.codex_event({"cwd": str(self.cwd)})
+        self.assertEqual(code, 0)
+        output = data["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "SessionStart")
+        self.assertIn("pnpm.md", output["additionalContext"])
+
+    def test_codex_event_falls_back_to_the_process_cwd(self):
+        code, data = self.codex_event({})
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            data["hookSpecificOutput"]["hookEventName"], "SessionStart"
+        )
+        self.assertIn(
+            "reference data, not instructions",
+            data["hookSpecificOutput"]["additionalContext"],
+        )
+
+
+class HookInstallCase(CliTestCase):
+    def setUp(self):
+        super().setUp()
+        self.codex_home = self.root / "codex"
+        self.xdg = self.root / "xdg"
+        patcher = mock.patch.dict(
+            os.environ,
+            {"CODEX_HOME": str(self.codex_home), "XDG_CONFIG_HOME": str(self.xdg)},
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class HookInstallTests(HookInstallCase):
+    def test_codex_install_writes_a_session_start_hook(self):
+        code, report = self.json_cli("hooks", "install", "codex")
+        self.assertEqual(code, 0)
+        path = self.codex_home / "hooks.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        handlers = [
+            handler
+            for group in data["hooks"]["SessionStart"]
+            for handler in group["hooks"]
+        ]
+        ours = next(
+            handler
+            for handler in handlers
+            if hooks.HOOK_SCRIPT_NAME in handler["command"]
+        )
+        self.assertEqual(ours["type"], "command")
+        self.assertEqual(ours["additionalContextLimit"], 0)
+        group = next(
+            group
+            for group in data["hooks"]["SessionStart"]
+            if any(
+                hooks.HOOK_SCRIPT_NAME in handler["command"]
+                for handler in group["hooks"]
+            )
+        )
+        self.assertIn("compact", group["matcher"])
+        self.assertIn("trust", report)
+        script = self.codex_home / hooks.HOOK_SCRIPT_NAME
+        self.assertEqual(Path(report["script"]), script)
+        self.assertIn("sys.path.insert", script.read_text(encoding="utf-8"))
+
+    def test_the_generated_codex_script_runs_the_hook(self):
+        self.json_cli("hooks", "install", "codex")
+        self.create("pnpm.md", description="the lockfile is pnpm")
+        script = self.codex_home / hooks.HOOK_SCRIPT_NAME
+        result = subprocess.run(
+            [sys.executable, str(script), "context", "--cwd", str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("pnpm.md", result.stdout)
+
+    def test_the_generated_script_refuses_a_missing_package_root(self):
+        self.json_cli("hooks", "install", "codex")
+        script = self.codex_home / hooks.HOOK_SCRIPT_NAME
+        text = script.read_text(encoding="utf-8")
+        missing = self.root / "missing-root"
+        text = text.replace(
+            repr(str(hooks._package_root())), repr(str(missing)), 1
+        )
+        broken = self.root / "broken_hook.py"
+        broken.write_text(text, encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(broken), "context", "--cwd", str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("re-run", result.stderr)
+
+    def test_codex_install_is_idempotent_and_keeps_other_hooks(self):
+        path = self.codex_home / "hooks.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "description": "keep me",
+                    "hooks": {
+                        "Stop": [
+                            {"hooks": [{"type": "command", "command": "echo stop"}]}
+                        ],
+                        "SessionStart": [
+                            {
+                                "matcher": "startup",
+                                "hooks": [
+                                    {"type": "command", "command": "echo other"}
+                                ],
+                            }
+                        ],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.json_cli("hooks", "install", "codex")
+        first = path.read_text(encoding="utf-8")
+        self.json_cli("hooks", "install", "codex")
+        self.assertEqual(path.read_text(encoding="utf-8"), first)
+        data = json.loads(first)
+        self.assertEqual(data["description"], "keep me")
+        commands = [
+            handler["command"]
+            for group in data["hooks"]["SessionStart"]
+            for handler in group["hooks"]
+        ]
+        self.assertEqual(
+            sum(hooks.HOOK_SCRIPT_NAME in command for command in commands), 1
+        )
+        self.assertIn("echo other", commands)
+        self.assertIn("echo stop", data["hooks"]["Stop"][0]["hooks"][0]["command"])
+
+    def test_codex_install_refuses_invalid_json(self):
+        path = self.codex_home / "hooks.json"
+        path.parent.mkdir(parents=True)
+        path.write_text("{not json", encoding="utf-8")
+        code, data = self.json_cli("hooks", "install", "codex")
+        self.assertEqual(code, 1)
+        self.assertEqual(data["error"], "invalid")
+        self.assertEqual(path.read_text(encoding="utf-8"), "{not json")
+
+    def test_codex_dry_run_writes_nothing(self):
+        code, report = self.json_cli("hooks", "install", "codex", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertTrue(report["changed"])
+        self.assertFalse((self.codex_home / "hooks.json").exists())
+        self.assertFalse((self.codex_home / hooks.HOOK_SCRIPT_NAME).exists())
+
+    def test_opencode_install_writes_a_self_contained_plugin(self):
+        code, report = self.json_cli("hooks", "install", "opencode")
+        self.assertEqual(code, 0)
+        directory = self.xdg / "opencode" / "plugins" / "memgrove"
+        path = directory / "index.js"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn('ctx.session.hook("context"', text)
+        self.assertIn("event.system.push", text)
+        self.assertNotIn("instructions.entry", text)
+        self.assertNotIn(
+            '@memgrove-command */ ["memgrove", "hooks", "run"];', text
+        )
+        self.assertIn(json.dumps(str(directory / "hook.py")), text)
+        self.assertTrue(report["path"].endswith("index.js"))
+        script = directory / "hook.py"
+        self.assertEqual(Path(report["script"]), script)
+        self.assertTrue(script.is_file())
+
+    def test_the_generated_opencode_script_runs_the_hook(self):
+        self.json_cli("hooks", "install", "opencode")
+        self.create("pnpm.md", description="the lockfile is pnpm")
+        script = self.xdg / "opencode" / "plugins" / "memgrove" / "hook.py"
+        result = subprocess.run(
+            [sys.executable, str(script), "context", "--cwd", str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("pnpm.md", result.stdout)
+
+    def test_opencode_install_is_idempotent(self):
+        path = self.xdg / "opencode" / "plugins" / "memgrove" / "index.js"
+        self.json_cli("hooks", "install", "opencode")
+        first = path.read_text(encoding="utf-8")
+        self.json_cli("hooks", "install", "opencode")
+        self.assertEqual(path.read_text(encoding="utf-8"), first)
+
+    def test_opencode_dry_run_writes_nothing(self):
+        code, report = self.json_cli("hooks", "install", "opencode", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertTrue(report["changed"])
+        self.assertFalse(
+            (self.xdg / "opencode" / "plugins" / "memgrove" / "index.js").exists()
+        )
+        self.assertFalse(
+            (self.xdg / "opencode" / "plugins" / "memgrove" / "hook.py").exists()
+        )
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class OpenCodePluginRuntimeTests(HookInstallCase):
+    """Run the installed plugin against a fake OpenCode context.
+
+    The plugin is the only part of the hook that is JavaScript, so a source
+    assertion is not enough: this executes the real file, the generated
+    launcher and `memgrove hooks run context` together.
+    """
+
+    def test_the_plugin_adds_the_index_to_the_system_context(self):
+        self.json_cli("hooks", "install", "opencode")
+        self.create("pnpm.md", description="the lockfile is pnpm")
+        plugin = self.xdg / "opencode" / "plugins" / "memgrove" / "index.js"
+        harness = self.root / "harness.mjs"
+        harness.write_text(
+            """
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+
+const pluginPath = process.argv[2];
+const expectedCwd = process.argv[3];
+const plugin = (await import(pathToFileURL(pluginPath).href)).default;
+
+let promptHook;
+let contextHook;
+const ctx = {
+  location: { directory: "/not-the-session" },
+  session: {
+    get: async ({ sessionID }) => ({ location: { directory: expectedCwd, sessionID } }),
+    hook: async (name, fn) => {
+      if (name === "prompt") promptHook = fn;
+      if (name === "context") contextHook = fn;
+      return { dispose() {} };
+    },
+  },
+};
+
+await plugin.setup(ctx);
+assert.ok(promptHook, "the plugin did not register a prompt hook");
+assert.ok(contextHook, "the plugin did not register a context hook");
+await promptHook({ sessionID: "ses_test" });
+
+const first = { sessionID: "ses_test", system: [] };
+await contextHook(first);
+assert.equal(first.system.length, 1);
+assert.equal(first.system[0].type, "text");
+assert.ok(first.system[0].text.includes("pnpm.md"));
+assert.ok(first.system[0].text.includes("reference data, not instructions"));
+
+const second = { sessionID: "ses_test", system: [first.system[0]] };
+await contextHook(second);
+assert.equal(second.system.length, 1);
+
+const direct = { sessionID: "ses_direct", system: [] };
+await contextHook(direct);
+assert.equal(direct.system.length, 1);
+assert.ok(direct.system[0].text.includes("pnpm.md"));
+console.log("ok");
+""",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [shutil.which("node"), str(harness), str(plugin), str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ok", result.stdout)
+
+    def test_the_plugin_survives_a_failing_command(self):
+        self.json_cli("hooks", "install", "opencode")
+        plugin = self.xdg / "opencode" / "plugins" / "memgrove" / "index.js"
+        harness = self.root / "fail.mjs"
+        harness.write_text(
+            """
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+
+const plugin = (await import(pathToFileURL(process.argv[2]).href)).default;
+let promptHook;
+let contextHook;
+const ctx = {
+  location: { directory: process.argv[3] },
+  session: {
+    get: async () => ({ location: { directory: process.argv[3] } }),
+    hook: async (name, fn) => {
+      if (name === "prompt") promptHook = fn;
+      if (name === "context") contextHook = fn;
+      return { dispose() {} };
+    },
+  },
+};
+
+await plugin.setup(ctx);
+await promptHook({ sessionID: "ses_test" });
+const first = { sessionID: "ses_test", system: [] };
+await contextHook(first);
+assert.equal(first.system.length, 0);
+const second = { sessionID: "ses_test", system: [] };
+await contextHook(second);
+assert.equal(second.system.length, 0);
+console.log("ok");
+""",
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env["MEMGROVE_BIN"] = str(self.root / "missing-memgrove")
+        result = subprocess.run(
+            [shutil.which("node"), str(harness), str(plugin), str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ok", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "the fake command is a POSIX script")
+    def test_a_failed_render_is_not_retried_in_the_same_turn(self):
+        self.json_cli("hooks", "install", "opencode")
+        plugin = self.xdg / "opencode" / "plugins" / "memgrove" / "index.js"
+        counter = self.root / "spawns"
+        fake = self.root / "fake-memgrove"
+        fake.write_text(
+            f"#!{sys.executable}\n"
+            "import pathlib\n"
+            f"pathlib.Path({str(counter)!r}).open('a', encoding='utf-8').write('x')\n"
+            "raise SystemExit(1)\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        harness = self.root / "count.mjs"
+        harness.write_text(
+            """
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+
+const plugin = (await import(pathToFileURL(process.argv[2]).href)).default;
+let promptHook;
+let contextHook;
+const ctx = {
+  location: { directory: process.argv[3] },
+  session: {
+    get: async () => ({ location: { directory: process.argv[3] } }),
+    hook: async (name, fn) => {
+      if (name === "prompt") promptHook = fn;
+      if (name === "context") contextHook = fn;
+      return { dispose() {} };
+    },
+  },
+};
+
+await plugin.setup(ctx);
+await promptHook({ sessionID: "ses_test" });
+for (let index = 0; index < 2; index += 1) {
+  const event = { sessionID: "ses_test", system: [] };
+  await contextHook(event);
+  assert.equal(event.system.length, 0);
+}
+console.log("ok");
+""",
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env["MEMGROVE_BIN"] = str(fake)
+        result = subprocess.run(
+            [shutil.which("node"), str(harness), str(plugin), str(self.cwd)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
 
 
 class MigrateTests(CliTestCase):

@@ -179,7 +179,9 @@ class ToolsListTests(McpTestCase):
         self.assertEqual(write["properties"]["store"]["enum"], ["global", "project"])
         self.assertEqual(write["properties"]["type"]["enum"], list(store.TYPES))
 
-        # The instructions are the whole onboarding: no instruction file exists.
+        # The instructions carry the usage contract; the index itself arrives
+        # through a per-client hook (Codex/OpenCode), because a client that
+        # defers MCP tools can hide this field at session start.
         init = self.serve(
             [self.request("initialize", {"protocolVersion": "2025-06-18"})]
         )[1][0]["result"]
@@ -195,32 +197,19 @@ class ToolsListTests(McpTestCase):
         # is a note the agent will never think to write.
         for memory_type in store.TYPES:
             self.assertIn(f"- {memory_type}:", init["instructions"])
-        # MCP has no channel that pushes the index into a client's context, so
-        # the only portable trigger is the contract: the first call of a
-        # conversation, and a repeat once the index is no longer in context.
-        self.assertIn("Session bootstrap", init["instructions"])
-        self.assertIn("compaction", init["instructions"])
-        # The trigger is the first user turn, not "the session": a session's
-        # start is invisible to the model, and a client's own opening ritual can
-        # claim the same slot. Both halves of that fix are load-bearing, so both
-        # stay asserted — a rewrite that drops either one brings the misses back.
-        self.assertIn("first user turn", init["instructions"])
-        self.assertIn("loading a skill", init["instructions"])
-        # Once per conversation, not once per user message. The earlier wording
-        # ("never answer from an index you saw only in an earlier context") was
-        # read as "any earlier turn" and re-took the index at the start of every
-        # new task; this sentence is what forbids that.
-        self.assertIn("is not a new session", init["instructions"])
-        self.assertIn(
+        # The hook owns the session-start timing. A ritual left in the text would
+        # bring back the repeat and the missed turn it was meant to fix.
+        self.assertNotIn("Session bootstrap", init["instructions"])
+        self.assertNotIn("first user turn", init["instructions"])
+        self.assertNotIn("loading a skill", init["instructions"])
+        self.assertNotIn("is not a new session", init["instructions"])
+        self.assertNotIn(
+            "first user turn", tools["memgrove_index"]["description"]
+        )
+        self.assertNotIn(
             "never on each new user message",
             tools["memgrove_index"]["description"],
         )
-        # A client that drops the instructions still sends the tool schemas.
-        self.assertIn("first user turn", tools["memgrove_index"]["description"])
-        # The fallback surface needs the arbitration clause too: a client that
-        # drops the instructions is exactly the one whose own skill gate can
-        # swallow the first call.
-        self.assertIn("loading a skill", tools["memgrove_index"]["description"])
 
     def test_required_arguments_are_named_in_prose(self):
         """A client can show a description without the input schema, so an

@@ -25,6 +25,12 @@ differences are the shell and a few file-system rules.
   mcp --scope user` works in PowerShell as written. opencode and DSH use their own config files
   under the home directory, with the same JSON/YAML as in
   [docs/agents.md](agents.md#client-configuration).
+- The hook installers work in PowerShell too. `memgrove hooks install codex` writes
+  `%USERPROFILE%\.codex\hooks.json` (or `$env:CODEX_HOME\hooks.json`) and `memgrove_hook.py` beside
+  it, and `memgrove hooks install opencode` writes
+  `%USERPROFILE%\.config\opencode\plugins\memgrove\index.js` plus its `hook.py` launcher. OpenCode
+  resolves its global config as `XDG_CONFIG_HOME` then `~/.config` on every platform, not
+  `%APPDATA%`.
 - The CLI prints UTF-8 JSON regardless of the console code page. Windows PowerShell 5.1 can
   still garble non-ASCII output when it reads a native command; use PowerShell 7+, or run
   `[Console]::OutputEncoding = [Text.Encoding]::UTF8` once per session. The same applies to

@@ -2,7 +2,7 @@
 
 **Persistent, local-first Markdown memory for AI coding agents.**
 
-Give Claude Code, OpenCode, DeepSeek Harness (DSH), and other
+Give Codex, Claude Code, OpenCode, DeepSeek Harness (DSH), and other
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) clients one shared store for
 useful notes across projects and sessions. Notes are ordinary Markdown files in
 `~/.agents/memgrove` — not a database — and the agent decides what is worth saving and reads a
@@ -43,6 +43,36 @@ On Windows the same commands work in PowerShell; see
 
 ## Connect an agent
 
+Register the MCP server for the read/write tools, then install the index hook for a client that
+supports one. Codex and OpenCode are covered today.
+
+Codex (CLI or ChatGPT desktop) — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.memgrove]
+command = "memgrove"
+args = ["mcp"]
+```
+
+```bash
+memgrove hooks install codex
+```
+
+Codex skips a new user hook until it is trusted: open `/hooks` (or **Settings > Hooks** in the
+desktop app) and trust the memgrove entry once.
+
+OpenCode — `~/.config/opencode/opencode.json`:
+
+```json
+{ "mcp": { "servers": { "memgrove": { "type": "local", "command": ["memgrove", "mcp"] } } } }
+```
+
+```bash
+memgrove hooks install opencode
+```
+
+OpenCode discovers the plugin from `~/.config/opencode/plugins/`; no config edit is needed.
+
 Claude Code:
 
 ```bash
@@ -52,14 +82,8 @@ claude mcp add memgrove memgrove mcp --scope user
 Also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`; otherwise Claude Code's native
 memory keeps writing a separate store.
 
-OpenCode — `~/.config/opencode/opencode.json`:
-
-```json
-{ "mcp": { "servers": { "memgrove": { "type": "local", "command": ["memgrove", "mcp"] } } } }
-```
-
-DSH, an agent with no MCP client, and the details of how the server's usage contract reaches the
-model are in [docs/agents.md](docs/agents.md).
+Claude Code and DSH use the MCP server but have no index hook yet. DSH, an agent with no MCP client,
+and the hook details are in [docs/agents.md](docs/agents.md).
 
 ## Check it works
 
@@ -71,15 +95,17 @@ memgrove list
 memgrove index
 ```
 
-On the next session's first turn the agent should call `memgrove_index` and see that note. If
-nothing arrives, check `memgrove --version` and the client's MCP log.
+On the next session the hook should put that note in front of the agent without a tool call. Ask it
+what it remembers. If nothing arrives, check `memgrove --version`, the Codex hook trust step, and
+the client's MCP log.
 
 ## How it works
 
 Retrieval *is* the index. `memgrove_index` returns the whole table of contents, `memgrove_read`
 loads one note, and `memgrove_write` saves one and consolidates its scope before returning: no
-keyword search, no model call, and nothing injected behind the agent's back. The server does not
-record conversations by itself; the agent chooses what is worth saving and when to read it back.
+keyword search and no model call. Codex loads the index through a small hook at session start, and
+OpenCode adds it to each model request; the server does not record conversations by itself, and the
+agent still chooses what is worth saving and when to read a note back.
 
 Each note is one Markdown file with a `name`, a one-line `description`, and one of four types
 (`user`, `feedback`, `project`, `reference`), in one of two scopes: `global` for what applies
@@ -90,7 +116,7 @@ pass, so fixing a body cannot move a note to another section of the index.
 
 | Document | Contents |
 |---|---|
-| [docs/agents.md](docs/agents.md) | MCP setup per client, the `instructions` contract, manual connection |
+| [docs/agents.md](docs/agents.md) | MCP setup per client, index hooks, the `instructions` contract, manual connection |
 | [docs/usage.md](docs/usage.md) | CLI reference, exit codes, consolidation, store layout, importing Claude Code notes |
 | [docs/windows.md](docs/windows.md) | Windows install and shell differences |
 | [docs/design.md](docs/design.md) | the design, the alternatives dropped, and the closed decisions |

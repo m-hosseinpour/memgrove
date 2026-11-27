@@ -4,6 +4,7 @@ Everything an agent does goes through the MCP server, which is this module's
 `store`/`index`/`dream` logic in-process. This CLI exists for two callers:
 
 * a human (or a hookless agent) running the same operations by hand;
+* a client hook that loads the index at session start, through `hooks run`;
 * `PROTOCOL.md`, the written contract for an agent that has no MCP client, which
   `memgrove protocol` prints so an installed package carries it too.
 
@@ -19,7 +20,7 @@ import sys
 from importlib import resources
 from pathlib import Path
 
-from . import __version__, config, dream, index, migrate, store
+from . import __version__, config, dream, hooks, index, migrate, store
 
 
 def _utf8_streams() -> None:
@@ -163,6 +164,26 @@ def cmd_protocol(args) -> int:
     return 0
 
 
+def cmd_hooks_install(args) -> int:
+    if args.client == "codex":
+        report = hooks.install_codex(dry_run=args.dry_run)
+    else:
+        report = hooks.install_opencode(dry_run=args.dry_run)
+    return _emit(report)
+
+
+def cmd_hooks_run_codex(args) -> int:
+    text = "" if sys.stdin.isatty() else sys.stdin.read()
+    json.dump(hooks.codex_output(text), sys.stdout, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_hooks_run_context(args) -> int:
+    sys.stdout.write(hooks.context(args.cwd).rstrip("\n") + "\n")
+    return 0
+
+
 def cmd_dream(args) -> int:
     return dream.run(cwd=args.cwd, all_scopes=args.all)
 
@@ -261,6 +282,31 @@ def build_parser() -> argparse.ArgumentParser:
         "protocol",
         help="print PROTOCOL.md, the guide for an agent without an MCP client",
     ).set_defaults(func=cmd_protocol)
+
+    hook_group = sub.add_parser(
+        "hooks", help="install or run the per-client index hooks"
+    )
+    hook_commands = hook_group.add_subparsers(dest="hooks_command", required=True)
+    hook_install = hook_commands.add_parser(
+        "install", help="install the index hook for one client"
+    )
+    hook_install.add_argument("client", choices=hooks.CLIENTS)
+    hook_install.add_argument(
+        "--dry-run", action="store_true", help="report the change without writing"
+    )
+    hook_install.set_defaults(func=cmd_hooks_install)
+    hook_run = hook_commands.add_parser(
+        "run", help="run a hook; the client calls this"
+    )
+    hook_names = hook_run.add_subparsers(dest="hook_name", required=True)
+    hook_names.add_parser(
+        "codex", help="read a Codex SessionStart event and print its output"
+    ).set_defaults(func=cmd_hooks_run_codex)
+    hook_context = hook_names.add_parser(
+        "context", help="print the index block for an OpenCode plugin"
+    )
+    hook_context.add_argument("--cwd", default=".")
+    hook_context.set_defaults(func=cmd_hooks_run_context)
 
     consolidate = sub.add_parser("dream", help="consolidate memories now")
     consolidate.add_argument("--cwd", default=".")
