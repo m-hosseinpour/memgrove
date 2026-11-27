@@ -5,6 +5,29 @@ rejected live in [`design.md`](design.md); the evidence behind them in [`researc
 Versions before 0.4.0 were not tagged, so those sections group the work by the version in the code
 at the end of each phase.
 
+## 0.5.0 — index hooks for Codex and OpenCode (2026-11-27)
+
+- The index no longer arrives through the MCP `instructions`. Codex defers MCP tools: the model can
+  see the server name and a short description while the `instructions` field and tool schemas stay
+  hidden until it searches, so a session started without the index. `memgrove_index` remains a
+  tool, but the session-start call is gone from the instructions and the tool description.
+- `memgrove hooks install codex` merges a `SessionStart` command hook into
+  `$CODEX_HOME/hooks.json` and writes `memgrove_hook.py` beside it. The hook covers `startup`,
+  `resume`, `clear`, `compact` and `fork`, sends the full uncapped index
+  (`additionalContextLimit: 0`), and preserves unrelated hooks. Codex still requires a one-time
+  trust in `/hooks`.
+- `memgrove hooks install opencode` writes a small plugin under
+  `~/.config/opencode/plugins/memgrove/`. It adds the index to the session's system context on each
+  model request and refreshes it on every prompt, so a note written mid-session appears and a
+  compaction is covered by the next request. No `opencode.json` edit is needed.
+- `memgrove hooks run codex` and `memgrove hooks run context` are the runtime entry points. Both go
+  through the shared index renderer, so the store logic has no second copy, and
+  `memgrove hooks install <client> --dry-run` previews a write. Each installer also writes a tiny
+  launcher that pins the interpreter and package location it ran from, so the hook works with a
+  minimal client PATH and from a checkout.
+- The hooks are opt-in per client: Claude Code and DSH keep the MCP server and get a hook when one
+  is added for them. No store format, note format or MCP tool call/result changed.
+
 ## 0.4.2 — clearer tool arguments (2026-11-25)
 
 - The MCP `instructions` and the `memgrove_read` / `memgrove_write` descriptions now name every
