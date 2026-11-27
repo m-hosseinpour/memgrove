@@ -31,7 +31,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 | File | Role |
 |---|---|
 | `README.md` | intro, install, connect an agent, first check, doc map |
-| `docs/agents.md` | MCP configuration per client, the `instructions` contract, manual connection |
+| `docs/agents.md` | MCP configuration per client, index hooks, the `instructions` contract, manual connection |
 | `docs/usage.md` | CLI, exit codes, consolidation, store layout, Claude Code import |
 | `docs/windows.md` | Windows install and shell/file-system differences |
 | `memgrove/PROTOCOL.md` | guide for agents without an MCP client; `memgrove protocol` prints it |

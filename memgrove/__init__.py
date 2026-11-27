@@ -3,4 +3,4 @@
 Public surface is the `memgrove` command; modules here are its implementation.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"

@@ -45,7 +45,7 @@
 | a 200-line / 25KB cap on the index | the index is the only retrieval path; truncating it hides notes rather than saving context |
 | lexical retrieval and a selection threshold | a complete index plus on-demand reading is enough; word overlap without a model does not understand relevance and mostly duplicates the index |
 | background extraction from the transcript | neither Claude Code nor Qoder had such a pass worth asking for; the agent itself writes |
-| a hook or plugin per agent | MCP is enough for any agent with an MCP client; only a client observed to hide `instructions`/tools at session start gets a thin index hook, not a second interface |
+| a hook or plugin per agent | MCP is enough for any agent with an MCP client; only a client observed to hide `instructions`/tools at session start, or one whose user asks, gets a thin index hook, not a second interface |
 | a section in `AGENTS.md` introducing the system | the MCP `instructions` do that and travel with the server |
 | git history in the store | Claude Code had no rollback either; consolidation deletes only on a version match, so history is not needed |
 | `.state/`, session counting, `dream.log` | consolidation runs after every change; no state is left to count (the lock, if any, is only short-lived — the directory inode on POSIX or `.memgrove.lock` on Windows — not a state file) |
@@ -212,9 +212,13 @@ Rules:
 |---|---|
 | **Codex** | MCP server in `~/.codex/config.toml` + `memgrove hooks install codex`; trust the hook once in `/hooks` |
 | **opencode** | MCP server in `~/.config/opencode/opencode.json` + `memgrove hooks install opencode` (an auto-discovered plugin) |
-| **Claude Code** | register the MCP server + `autoMemoryEnabled: false` in `~/.claude/settings.json`; no index hook yet |
-| **DSH** | one `@deepseek-ai/dsh-mcp-client` row in `~/.dsh/cordis.patch.yml`; no index hook yet |
-| **any other agent** | MCP if it has one; otherwise hand it `PROTOCOL.md` manually |
+| **Claude Code** | register the MCP server + `autoMemoryEnabled: false` in `~/.claude/settings.json`; no index hook yet (ask for one) |
+| **DSH** | one `@deepseek-ai/dsh-mcp-client` row in `~/.dsh/cordis.patch.yml`; no index hook yet (ask for one) |
+| **any other agent** | MCP if it has one; otherwise hand it `PROTOCOL.md` manually; ask for a hook if the client exposes a lifecycle point |
+
+A client without a hook is not excluded forever: a request is enough to add a thin adapter, because
+it only needs one lifecycle point and the shared `memgrove hooks run context` entry point. The adapter
+must not duplicate store logic.
 
 **Why not `AGENTS.md`:** that file is read in full in every session and must stay short. The MCP
 `instructions` carry the same guidance along with the server and are not duplicated across agents.

@@ -82,8 +82,9 @@ claude mcp add memgrove memgrove mcp --scope user
 Also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`; otherwise Claude Code's native
 memory keeps writing a separate store.
 
-Claude Code and DSH use the MCP server but have no index hook yet. DSH, an agent with no MCP client,
-and the hook details are in [docs/agents.md](docs/agents.md).
+Claude Code and DSH use the MCP server but have no index hook yet. If you want a hook for one of
+them, or for another client, ask — the adapter is small and does not change the store. DSH, an
+agent with no MCP client, and the hook details are in [docs/agents.md](docs/agents.md).
 
 ## Check it works
 

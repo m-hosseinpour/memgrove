@@ -5,6 +5,15 @@ rejected live in [`design.md`](design.md); the evidence behind them in [`researc
 Versions before 0.4.0 were not tagged, so those sections group the work by the version in the code
 at the end of each phase.
 
+## 0.5.1 — invite hooks for other clients (2026-11-27)
+
+- README and docs now say that Claude Code, DSH and any other MCP client can get an index hook on
+  request, instead of leaving "no hook yet" as a dead end. The adapter only needs one lifecycle
+  point and the shared `memgrove hooks run context` entry point.
+- The `AGENTS.md` document map now names `docs/agents.md` as the hook reference too; the manual
+  `PROTOCOL.md` guide keeps its no-MCP role.
+- No code, store format, CLI or MCP behavior changed.
+
 ## 0.5.0 — index hooks for Codex and OpenCode (2026-11-27)
 
 - The index no longer arrives through the MCP `instructions`. Codex defers MCP tools: the model can
@@ -25,8 +34,8 @@ at the end of each phase.
   `memgrove hooks install <client> --dry-run` previews a write. Each installer also writes a tiny
   launcher that pins the interpreter and package location it ran from, so the hook works with a
   minimal client PATH and from a checkout.
-- The hooks are opt-in per client: Claude Code and DSH keep the MCP server and get a hook when one
-  is added for them. No store format, note format or MCP tool call/result changed.
+- The hooks are opt-in per client: Claude Code and DSH keep the MCP server and get a hook on request
+  when one is added for them. No store format, note format or MCP tool call/result changed.
 
 ## 0.4.2 — clearer tool arguments (2026-11-25)
 

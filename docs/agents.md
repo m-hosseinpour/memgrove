@@ -68,7 +68,8 @@ The same registration by hand, in `~/.claude.json` (user scope):
 
 Also set `"autoMemoryEnabled": false` in `~/.claude/settings.json`, or its native memory keeps
 writing a separate store ([why](design.md#9-integration-with-agents)). Claude Code has no index hook
-in this release; its MCP tools still read and write the store.
+in this release; its MCP tools still read and write the store. Ask for a hook if you want one — the
+adapter is small and reuses the same launcher and CLI entry point.
 
 ### DSH
 
@@ -85,7 +86,8 @@ in this release; its MCP tools still read and write the store.
         args: ['mcp']
 ```
 
-DSH has no index hook in this release.
+DSH has no index hook in this release. Ask for one if you need it — the adapter is a small addition
+and does not change the store contract.
 
 ## Hooks
 
@@ -96,6 +98,9 @@ in one place:
 |---|---|---|
 | Codex | `memgrove hooks install codex` | the generated `memgrove_hook.py` calls `memgrove hooks run codex` from a `SessionStart` command hook |
 | OpenCode | `memgrove hooks install opencode` | the plugin calls the generated `hook.py`, which runs `memgrove hooks run context --cwd …` |
+
+A client not listed here is not excluded: a request is enough to add a thin adapter, because it only
+needs one lifecycle point and the shared `memgrove hooks run context` entry point.
 
 `memgrove hooks run context` prints the index plus the short read/write contract.
 `memgrove hooks run codex` reads the Codex event JSON on stdin and prints
@@ -142,6 +147,7 @@ memgrove protocol > ~/.agents/memgrove/PROTOCOL.md
 ```
 
 The file ships inside the package, so `memgrove protocol` also works from a PyPI install with no
-checkout. It is not shown automatically: the MCP `instructions` are the onboarding path, the
-server never exposes it as a tool or a resource, and the protocol file is only for an agent that
-has to connect by hand. The store itself is created on the first write at `~/.agents/memgrove`.
+checkout. It is not shown automatically: the MCP `instructions` (and, for Codex and OpenCode, the
+index hook) are the onboarding path, the server never exposes it as a tool or a resource, and the
+protocol file is only for an agent that has to connect by hand. The store itself is created on the
+first write at `~/.agents/memgrove`.
